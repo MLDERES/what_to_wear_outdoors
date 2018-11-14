@@ -3,16 +3,14 @@
 
 """Tests for `what_to_wear_outdoors` package."""
 
-
 import unittest
 from click.testing import CliRunner
 
-from what_to_wear_outdoors import what_to_wear_outdoors
 from what_to_wear_outdoors import cli
 from what_to_wear_outdoors.weather_observation import Weather
 
 
-class TestWhat_to_wear_outdoors(unittest.TestCase):
+class Test_what_to_wear_outdoors(unittest.TestCase):
     """Tests for `what_to_wear_outdoors` package."""
 
     def setUp(self):
@@ -26,8 +24,8 @@ class TestWhat_to_wear_outdoors(unittest.TestCase):
 
     # Test to ensure that the correct query string is being created for weather query locations
     def test_build_query_string(self):
-        assert(Weather._build_location_query(72712) == 72712)
-        assert(Weather._build_location_query('Fayetteville, AR') == 'AR/Fayetteville')
+        assert (Weather._build_location_query(72712) == 72712)
+        assert (Weather._build_location_query('Fayetteville, AR') == 'AR/Fayetteville')
         assert (Weather._build_location_query('Fayetteville,AR') == 'AR/Fayetteville')
         assert (Weather._build_location_query('Bentonville') == 'Bentonville')
         assert (Weather._build_location_query('72712') == '72712')
