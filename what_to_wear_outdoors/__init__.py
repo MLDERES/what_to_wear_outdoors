@@ -10,8 +10,6 @@ __email__ = 'mlderes@hotmail.com'
 __version__ = '0.1.0'
 
 
-
-
 # Setup logging of debug messages to go to the file debug.log and the INFO messages
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
