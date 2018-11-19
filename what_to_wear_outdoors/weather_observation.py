@@ -1,9 +1,9 @@
-import json
-import logging
 import requests
 import dotenv
 import os
 import re
+import logging
+import json
 
 dotenv.load_dotenv()
 WU_API_KEY = os.getenv("WU_API_KEY")
@@ -20,6 +20,8 @@ DATE_HOUR = 'hour'
 DATE_MONTH = 'mon'
 DATE_DAY = 'mday'
 DATE_YEAR = 'year'
+DAY_OF_WEEK = 'weekday_name'
+CIVIL = 'civil'
 
 CONDITION_KEY = 'condition'  # this would be the technical description
 FANCY_COND_KEY = 'wx'  # this is the human readable condition
@@ -47,7 +49,7 @@ class JsonDictionary(dict):
         return None if float(self[key]) <= NULL_VALUE else float(self[key])
 
 
-class Forecast():
+class Forecast:
     def __init__(self):
         super(Forecast, self).__init__()
         self.location = ""
@@ -62,19 +64,24 @@ class Forecast():
         self.tod = 0
         self.month_day = 1
         self.mth = 1
+        self.dow = 'Unknown'
+        self.civil_time = '00:00 AM'
 
     def __str__(self):
         return f'Forecast for {self.location} ' \
-               f'on Month-Day: {self.mth}-{self.month_day} ' \
-               f'@ Hour: {self.tod}. Temp(feels like f):{self.feels_like_f} ' \
-               f'Condition:{self.condition} ' \
-               f'Precip Percentage: {self.precip_chance}'
+               f'on {self.dow} (Month-Day): {self.mth}-{self.month_day} ' \
+               f'at {self.civil_time}. ' \
+               f'\n\tTemperature (feels like): {self.feels_like_f} °F' \
+               f'\n\tWind {self.wind_speed} mph from {self.wind_dir}' \
+               f'\n\tConditions: {self.condition} ' \
+               f'\n\tChance of precipitation: {self.precip_chance}'
 
     @staticmethod
     def get_fct_key(d=0, m=0, h=0):
-        return "{}_{}_{}".format(h, d, m)
+        return "{}_{}_{}".format(m, d, h)
 
-    def _read_int(self, i):
+    @staticmethod
+    def _read_int(i):
         return None if int(i) <= NULL_VALUE else int(i)
 
     def _read_float(self, f):
@@ -85,6 +92,8 @@ class Forecast():
         time_dct = JsonDictionary(dct[FCAST_TIME_KEY])
         fcast.tod = time_dct.read_int(DATE_HOUR)
         fcast.mth = time_dct.read_int(DATE_MONTH)
+        fcast.dow = time_dct[DAY_OF_WEEK]
+        fcast.civil_time = time_dct[CIVIL]
         fcast.month_day = time_dct.read_int(DATE_DAY)
         fcast.condition = dct[CONDITION_KEY]
         fcast.condition_human = dct[FANCY_COND_KEY]
@@ -94,6 +103,7 @@ class Forecast():
         fcast.wind_dir = dct[WIND_DIR_KEY]['dir']
         fcast.wind_speed = self._read_float(dct[WIND_SPEED_KEY][ENG_KEY])
         fcast.precip_chance = self._read_float(dct[RAIN_CHANCE_KEY])
+
         return fcast
 
 
@@ -130,6 +140,9 @@ class Weather:
             resp = requests.get(weather_request)
             if (resp.status_code == 200):
                 wu_response = resp.json()
+                if dbg :
+                    with open('sample_forecast.json', 'w') as fp:
+                        json.dump(wu_response, fp)
                 _All_Forecasts_Location[location] = self._build_forecasts(wu_response, location)
             else:
                 print('Danger Will Robinson we got a bad response from WU {resp.status_code}')

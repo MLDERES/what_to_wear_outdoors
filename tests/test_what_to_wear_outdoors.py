@@ -5,7 +5,6 @@
 
 import unittest
 from click.testing import CliRunner
-
 from what_to_wear_outdoors import cli
 from what_to_wear_outdoors.weather_observation import Weather
 
@@ -29,6 +28,32 @@ class Test_what_to_wear_outdoors(unittest.TestCase):
         assert (Weather._build_location_query('Fayetteville,AR') == 'AR/Fayetteville')
         assert (Weather._build_location_query('Bentonville') == 'Bentonville')
         assert (Weather._build_location_query('72712') == '72712')
+
+    def test_parse_time(self):
+        assert (cli.parse_time('10:00 PM') == 22)
+        assert (cli.parse_time('10:00 am') == 10)
+        assert (cli.parse_time('10:05 AM') == 10)
+        assert (cli.parse_time('10:00 pm') == 22)
+        assert (cli.parse_time('10:00 pM') == 22)
+        assert (cli.parse_time('10:00 Am') == 10)
+        assert (cli.parse_time('10') == 10)
+        assert (cli.parse_time('23') == 23)
+        assert (cli.parse_time('5') == 5)
+        assert (cli.parse_time('830pm') == 20)
+        assert (cli.parse_time('830 aM') == 8)
+        assert (cli.parse_time('830') == 8)
+        assert (cli.parse_time('2300') == 23)
+        assert (cli.parse_time('1000') == 10)
+        assert (cli.parse_time('1005') == 10)
+        assert (cli.parse_time('10AM') == 10)
+        assert (cli.parse_time('10PM') == 22)
+        assert (cli.parse_time('10 AM') == 10)
+        assert (cli.parse_time('10 PM') == 22)
+        assert (cli.parse_time('10 am') == 10)
+        assert (cli.parse_time('10 pm') == 22)
+
+    def test_figure_out_date(self):
+        pass
 
     def test_command_line_interface(self):
         """Test the CLI."""
