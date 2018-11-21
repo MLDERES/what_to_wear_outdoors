@@ -26,7 +26,7 @@ Suggestions for how to dress based on the expected weather during the activity
 Features
 --------
 
-* TODO
+* Gets the weather forecast for a specific time and specific location (zip or city, state combo)
 
 Credits
 -------

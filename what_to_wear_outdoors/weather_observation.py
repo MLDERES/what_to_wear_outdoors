@@ -74,7 +74,7 @@ class Forecast:
                f'\n\tTemperature (feels like): {self.feels_like_f} °F' \
                f'\n\tWind {self.wind_speed} mph from {self.wind_dir}' \
                f'\n\tConditions: {self.condition} ' \
-               f'\n\tChance of precipitation: {self.precip_chance}'
+               f'\n\tChance of precipitation: {self.precip_chance} %'
 
     @staticmethod
     def get_fct_key(d=0, m=0, h=0):
