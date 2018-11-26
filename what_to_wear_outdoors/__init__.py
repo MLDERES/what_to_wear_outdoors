@@ -2,7 +2,7 @@
 
 """Top-level package for What to Wear Outdoors."""
 import logging
-import what_to_wear_outdoors.weather_observation
+from what_to_wear_outdoors import Forecast, weather_observation, Running
 
 
 __author__ = """Michael Dereszynski"""

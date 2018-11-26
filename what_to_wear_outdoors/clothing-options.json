@@ -1,0 +1,70 @@
+{
+    "run": {
+        "always": {
+            "all": "sunscreen"
+        },
+        "cold": {
+            "head": "warm hat",
+            "upper_body": [
+                "heavy sweatshirt",
+                "jacket"
+            ],
+            "arms": "",
+            "hands": "gloves",
+            "lower_body": "insulated tights",
+            "legs": "",
+            "feet": "wool socks"
+        },
+        "cool": {
+            "head": "",
+            "upper_body": "long-sleeved shirt",
+            "arms": "",
+            "hands": "",
+            "lower_body": "[tights, shorts]",
+            "legs": "",
+            "feet": "warm socks"
+        },
+        "mild": {
+            "head": "",
+            "upper_body": "long-sleeved shirt",
+            "arms": "",
+            "hands": "",
+            "lower_body": "shorts",
+            "legs": "calf sleeves",
+            "feet": "socks"
+        },
+        "warm": {
+            "head": "ball cap",
+            "upper_body": "t-shirt",
+            "arms": "",
+            "hands": "",
+            "lower_body": "shorts",
+            "legs": "",
+            "feet": "socks"
+        },
+        "very warm": {
+            "head": "ball cap",
+            "upper_body": "t-shirt",
+            "arms": "",
+            "hands": "",
+            "lower_body": "shorts",
+            "legs": "",
+            "feet": "moisture wicking socks"
+        },
+        "hot": {
+            "head": "",
+            "upper_body": "t-shirt",
+            "arms": "",
+            "hands": "",
+            "lower_body": "shorts",
+            "legs": "",
+            "feet": "moisture wicking socks"
+        },
+        "sunny": {
+            "face": "sunglasses"
+        },
+        "cloudy": {
+            "face": "yellow to clear sunglasses"
+        }
+    }
+}

@@ -128,6 +128,7 @@ class Weather:
     '''
     This function gets an hourly forecast for the next 10 days.
     '''
+
     def get_forecast(self, dt, location='72712', dbg=False):
         # dt should be the date and the time
         logging.debug('get_weather location = ' + location)
@@ -140,7 +141,7 @@ class Weather:
             resp = requests.get(weather_request)
             if (resp.status_code == 200):
                 wu_response = resp.json()
-                if dbg :
+                if dbg:
                     with open('sample_forecast.json', 'w') as fp:
                         json.dump(wu_response, fp)
                 _All_Forecasts_Location[location] = self._build_forecasts(wu_response, location)
@@ -156,8 +157,8 @@ class Weather:
         expression = r'(^\d{5}$)|(^[\w\s]+),\s*(\w{2}$)|(^[\w\s]+)'
         mo = re.match(expression, str(location))
         if mo and mo.group(2) is not None:
-        # if we have matched City, State then we need to build the query as ST/City.json
-        # otherwise we can just use City or Zip + .json
+            # if we have matched City, State then we need to build the query as ST/City.json
+            # otherwise we can just use City or Zip + .json
             query_loc = f'{mo.group(3)}/{mo.group(2)}'
         return query_loc
 

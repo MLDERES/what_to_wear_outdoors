@@ -6,16 +6,12 @@ from dateutil.parser import parse
 import sys
 import re
 import click
-from weather_observation import Weather
+from weather_observation import Weather, Forecast
+from clothing_options import Running
 import logging
 import textwrap
 
 Colors = {'Title': 'blue', 'Description': 'cyan', 'Prompt': 'yellow', 'Error': 'red', 'Output': 'green'}
-
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    filename='debug.log',
-                    filemode='a')
 
 days_of_the_week = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 NOW = dt.datetime.now()
@@ -79,7 +75,9 @@ def main():
     logging.debug(f'Forecast (calculated): {forecast_dt}')
     fct = w.get_forecast(forecast_dt, activity_location)
     print(fct)
-    #click.secho(fct.to_string(), fg=Colors['Output'])
+    running = Running()
+    print('\n')
+    [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(running.build_reply(fct))]
 
 
 def parse_time(time_string):
@@ -103,6 +101,14 @@ def figure_out_date(weekday):
     if (dow_target < dow_today):
         days_ahead = + 7
     return dt.datetime.today() + dt.timedelta(days=days_ahead)
+
+
+# def _determine_what_to_wear(dt, t, location):
+#     # Now we can go on
+#     logging.debug("Calling get_weather({},{},{})".format(dt, t, location))
+#     forecast = get_weather_forecast(dt, t, location)
+#     logging.debug("Got a weather forecast.")
+
 
 
 if __name__ == "__main__":
