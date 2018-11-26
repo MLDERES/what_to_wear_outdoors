@@ -1,16 +1,16 @@
 import requests
-import dotenv
-import os
+# import dotenv
+# import os
 import re
 import logging
 import json
 
-dotenv.load_dotenv()
-WU_API_KEY = os.getenv("WU_API_KEY")
-if WU_API_KEY is None:
-    raise EnvironmentError(
-        "The environment variable WU_API_KEY is required to run this program.")
-
+# dotenv.load_dotenv()
+# WU_API_KEY = os.getenv("WU_API_KEY")
+# if WU_API_KEY is None:
+#     raise EnvironmentError(
+#         "The environment variable WU_API_KEY is required to run this program.")
+WU_API_KEY = '7d65568686ff9c25'
 # So lets just key our observations off of mon_day_year
 #  We'll store pretty date for whatever reason
 FORECAST_KEY = 'hourly_forecast'

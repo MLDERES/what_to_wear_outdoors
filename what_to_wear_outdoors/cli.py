@@ -13,7 +13,7 @@ import textwrap
 
 Colors = {'Title': 'blue', 'Description': 'cyan', 'Prompt': 'yellow', 'Error': 'red', 'Output': 'green'}
 
-days_of_the_week = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+days_of_the_week = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 NOW = dt.datetime.now()
 TITLE = f'#{"-"*18} What to Wear Outdoors {"-"*18}#'
 
@@ -67,7 +67,7 @@ def main():
         forecast_dt = prompt_for_date_time()
 
     activity_location = click.prompt(
-        click.style("Where are you going outside (zip, city or city,state)? ",
+        click.style("Where are you going outside (zip or city,state)? ",
                     fg=Colors['Prompt']),
         default='Fayetteville, AR')
 
@@ -95,7 +95,7 @@ def parse_time(time_string):
 def figure_out_date(weekday):
     if (weekday == 'today'): return NOW
     if (weekday == 'tomorrow'): return NOW + dt.timedelta(days=1)
-    dow_target = days_of_the_week.index(weekday.lower())
+    dow_target = days_of_the_week.index(weekday.lower()[:3])
     dow_today = dt.datetime.weekday(NOW)
     days_ahead = dow_target - dow_today
     if (dow_target < dow_today):
