@@ -8,6 +8,7 @@ from weather_observation import Weather, Forecast
 from clothing_options_ml import Running
 import logging
 import textwrap
+from train_model import train
 
 # TODO: Manage Command Line Arguments
 #  (-u for update model (with Excel), (-f to ask for forecast) (-d for default config) (no flags for walk-through)
@@ -37,6 +38,24 @@ def prompt_for_date_time():
 
     # @click.command()
 
+
+'''
+Here's what I want the interface to look like - 
+    wtw --athlete --activity outdoor activity for advice on clothing default='run' options 'run, road, mtb' [cmd]
+    [cmd] update - updates the model
+            --filename using the filename specified here default='../data/what i wore running.xlsx'
+          test - short-hand to execute without the prompts
+            --activity outdoor activity for advice on clothing default='run' options 'run, road, mtb'
+            --duration=duration
+            --wind_speed
+            --feel - feels like temperature
+            --humidity
+            --daylight - is there daylight or not options='true/false' default true
+          predict - this is also shorthand, but gets the forecast
+            --date - Sunday, Monday, etc or today, tomorrow default='today'
+            --time - hour of the day can be 24hr time, 10:00, 10am, 10PM, 22:00, 22 default='top of the next hour'
+            --loc - location, either zip or [city,state] default=72712   
+'''
 
 # @click.option('--date', default=dt.datetime.now().date(), help='date that you will be going outside', prompt=True)
 # @click.option('--day', default=dt.datetime.now().weekday())
@@ -101,6 +120,10 @@ def figure_out_date(weekday):
     if (dow_target < dow_today):
         days_ahead = + 7
     return dt.datetime.today() + dt.timedelta(days=days_ahead)
+
+
+def train_models():
+    train()
 
 if __name__ == "__main__":
     sys.exit(main())  # pragma: no cover

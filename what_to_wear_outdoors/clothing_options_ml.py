@@ -8,16 +8,16 @@ from utility import get_model_filename
 from weather_observation import Forecast
 
 # TODO: Build response string from ML results
-OUTFIT_COMPONENTS = {'calf_sleeves': {'name': 'Calf Sleeves'},
-                     'ears_hat': {'name': 'Hat or Ear Cover'},
-                     'gloves': {'name': 'Full fingered gloves'},
-                     'heavy_socks': {'name': 'Wool or insulated socks', 'false_name': 'Regular socks'},
-                     'jacket': {'name': 'Windbreaker'},
-                     'long_sleeves': {'name': 'Long-sleeved shirt'},
-                     'short_sleeves': {'name': 'Short-sleeved shirt'},
-                     'shorts': {'name': 'Shorts'},
-                     'sweatshirt': {'name': 'Sweatshirt/heavier long-sleeves'},
-                     'tights': {'name': 'Tights'}
+OUTFIT_COMPONENTS = {'calf_sleeves': {'name': 'calf sleeves'},
+                     'ears_hat': {'name': 'ear covers'},
+                     'gloves': {'name': 'full fingered gloves'},
+                     'heavy_socks': {'name': 'wool or insulated socks', 'false_name': 'regular socks'},
+                     'jacket': {'name': 'a windbreaker'},
+                     'long_sleeves': {'name': 'a long-sleeved shirt'},
+                     'short_sleeves': {'name': 'a short-sleeved shirt'},
+                     'shorts': {'name': 'shorts'},
+                     'sweatshirt': {'name': 'a sweatshirt or heavier long-sleeve outwear'},
+                     'tights': {'name': 'tights'}
                      }
 # Get the list of keys to the clothing dictionary as a list for convenience
 CLOTHING_KEYS = [*OUTFIT_COMPONENTS.keys()]
@@ -78,21 +78,21 @@ class BaseOutfit(object):
 
     _response_prefixes = {
         "initial":
-            ["It looks like ",
-             "Oh my ",
-             "Well ",
-             "Temperature seems ",
-             "Weather underground says "],
+            ["It looks like",
+             "Oh my",
+             "Well",
+             "Temperature seems",
+             "Weather underground says"],
         "clothing":
-            ["I suggest wearing ",
-             "Based on the weather conditions, you should consider ",
-             "Looks like today would be a good day to wear ",
-             "If I were going out I'd wear "],
+            ["I suggest wearing",
+             "Based on the weather conditions, you should consider",
+             "Looks like today would be a good day to wear",
+             "If I were going out I'd wear"],
         ALWAYS_KEY:
-            ["Of course, you should always ",
-             "It would be insane not to wear ",
-             "Also, you should always wear ",
-             "And I never go out without "]}
+            ["Of course, you should always",
+             "It would be insane not to wear",
+             "Also, you should always wear",
+             "And I never go out without"]}
 
     def __init__(self, temp_offset=0):
         self._temp_offset = temp_offset
@@ -140,13 +140,9 @@ class BaseOutfit(object):
         return reply_always
 
     def _build_reply_main(self, outfit_items):
-        reply_clothing = ""
         if outfit_items is None:
             raise (ValueError())
-
-        reply_clothing += self.clothing_prefix
-        reply_clothing += \
-            self._build_generic_from_list(outfit_items)
+        reply_clothing = f'{self.clothing_prefix} {self._build_generic_from_list(outfit_items)}'
         return reply_clothing
 
     def build_reply(self, forecast, duration=0):
@@ -160,10 +156,10 @@ class BaseOutfit(object):
         items = self.pred_clothing(duration=duration, wind_speed=forecast.wind_speed, feel=forecast.feels_like_f,
                                    hum=forecast.humidity, light=forecast.is_daylight, item='all')
         temp_f = forecast.feels_like_f
-        reply_temperature = f'{self.initial_prefix} {self._get_condition_for_temp(temp_f)}' \
-            f'{temp_f} degrees.'
+        reply_temperature = f'{self.initial_prefix} {self._get_condition_for_temp(temp_f)}: ' \
+            f'{temp_f} degrees'
         if items is not None:
-            reply = f'{reply_temperature}.{self._build_reply_main(items)}. {self._build_always_reply()}'
+            reply = f'{reply_temperature}.\n{self._build_reply_main(items)}. {self._build_always_reply()}'
         else:
             reply = reply_temperature
             reply += "Unfortunately, I don't know how to tell you to dress for that condition."
@@ -193,11 +189,14 @@ class BaseOutfit(object):
 ################################################
 class Running(BaseOutfit):
     ACTIVITY_TYPE = "run"
+    outfit_component_description = {'ears_hat': {'name': 'a hat or ear covers'},
+                                    'sweatshirt': {'name': 'a sweatshirt'}, }
 
 
-r = Running()
-print(r.pred_clothing(duration=30, wind_speed=15, feel=75, hum=0, item=OUTFIT_COMPONENTS, light=True))
-print(r.pred_clothing(duration=30, wind_speed=15, feel=75, hum=0, item='all', light=True))
-print(r.pred_clothing(duration=60, wind_speed=15, feel=35, hum=65, item='all', light=True))
-pred = r.pred_clothing(duration=60, wind_speed=15, feel=35, hum=65, item='all', light=True)
-print(f'{r._build_generic_from_list(pred)}')
+if __name__ == '__main__':
+    r = Running()
+    print(r.pred_clothing(duration=30, wind_speed=15, feel=75, hum=0, item=OUTFIT_COMPONENTS, light=True))
+    print(r.pred_clothing(duration=30, wind_speed=15, feel=75, hum=0, item='all', light=True))
+    print(r.pred_clothing(duration=60, wind_speed=15, feel=35, hum=65, item='all', light=True))
+    pred = r.pred_clothing(duration=60, wind_speed=15, feel=35, hum=65, item='all', light=True)
+    print(f'{r._build_generic_from_list(pred)}')
