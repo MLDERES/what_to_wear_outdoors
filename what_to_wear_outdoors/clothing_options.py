@@ -130,7 +130,7 @@ class BaseOutfit(object):
         reply_clothing += self._build_generic_from_dict(self._outfit, self.BODY_PARTS_KEYS)
         return reply_clothing
 
-    def build_reply(self, forecast):
+    def build_reply(self, forecast, duration=0):
         # Here's where we are going to build reply
         # A: It looks like it is going to be warm (cold, frigid, chilly, hot, mild, super hot)
         temp = forecast.feels_like_f

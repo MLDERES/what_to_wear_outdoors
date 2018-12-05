@@ -7,6 +7,7 @@ from utility import get_model_filename
 
 from weather_observation import Forecast
 
+# TODO: Build response string from ML results
 OUTFIT_COMPONENTS = {'calf_sleeves': {'name': 'Calf Sleeves'},
                      'ears_hat': {'name': 'Hat or Ear Cover'},
                      'gloves': {'name': 'Full fingered gloves'},
@@ -18,26 +19,62 @@ OUTFIT_COMPONENTS = {'calf_sleeves': {'name': 'Calf Sleeves'},
                      'sweatshirt': {'name': 'Sweatshirt/heavier long-sleeves'},
                      'tights': {'name': 'Tights'}
                      }
+# Get the list of keys to the clothing dictionary as a list for convenience
+CLOTHING_KEYS = [*OUTFIT_COMPONENTS.keys()]
 class BaseOutfit(object):
     """ Base class for different activity options.
         Working off the machine determined models
     """
-    ACTIVITY_TYPE = ""  # Should be overridden in child classes to know where to look in the JSON config
+    ACTIVITY_TYPE = ""  # Should be overridden in child classes
     # Override in other subclasses if this list should be different
     ALWAYS_KEY = "always"
+    outfit_component_description = {}
+    """ This should be overridden in classes where the default description is not adequate
+    """
 
-    _configuration = None
+    def _get_component_description(self, item_key, false_name=False) -> str:
+        """ Determine the proper description of the items that are to be worn (or not)
+        
+        This method allows for subclasses to override the default descriptions or to provide alternative
+        'false_names'.  False names is a simple way to handle the situation where there are only two options - 
+        for instance heavy_socks.  If not recommending heavy socks then we recommend regular socks.
+        It would be irregular to suggest wearing two kinds of socks, so two alternatives makes sense
+        
+        :param item_key: the item for which the description should be fetched 
+        :param false_name:  if the algorithm says don't get this value, then if there is an alternative return that
+        :return: string with the description of the item component
+        """
+        item_dict = OUTFIT_COMPONENTS[item_key]
+        if (self.outfit_component_description is not None) and item_key in self.outfit_component_description:
+            item_dict = self.outfit_component_description[item_key]
+        if false_name:
+            item_description = item_dict['false_name'] if 'false_name' in item_dict else None
+        else:
+            item_description = item_dict['name']
+        return item_description
 
     #  Just a couple of attempts to see what it turns up
-    def pred_clothing(self, duration, wind_speed, feel, hum, item='shorts', light=True):
-        model_file = open(get_model_filename(item, sport=self.ACTIVITY_TYPE), 'rb')
-        model = pickle.load(model_file)
-        model_file.close()
-        pms = np.array([duration, wind_speed, feel, hum, not light, light]).reshape(1, -1)
-        prediction = model.predict(pms)
-        df = model.decision_function(pms)
-        print(f'{item}: {prediction} Feel:{feel} Humidity:{hum} WS: {wind_speed} Duration:{duration} Light:{light}')
-        return prediction, df
+    def pred_clothing(self, duration, wind_speed, feel, hum, light=True, item='all'):
+        outfit = []
+        if item == 'all':
+            item_list = CLOTHING_KEYS
+        elif type(item) is dict or type(item) is list:
+            item_list = item
+        else:
+            item_list = [item]
+
+        for i in item_list:
+            model_file = open(get_model_filename(i, sport=self.ACTIVITY_TYPE), 'rb')
+            model = pickle.load(model_file)
+            model_file.close()
+            pms = np.array([duration, wind_speed, feel, hum, not light, light]).reshape(1, -1)
+            prediction = model.predict(pms)
+            logging.debug(
+                f'{item}: {prediction} Feel:{feel} Humidity:{hum} WS: {wind_speed} Duration:{duration} Light:{light}')
+            # TODO: Deal with the case where there are multiple levels of choice
+            outfit.append(self._get_component_description(i, not prediction))
+
+        return outfit
 
     _response_prefixes = {
         "initial":
@@ -66,7 +103,6 @@ class BaseOutfit(object):
         """ Given a temperature (Farenheit), return a key (condition) used
             to gather up configuratons
         """
-        condition = "cold"
         t = int(temp_f) + self._temp_offset
         if t < 40:
             condition = "cold"
@@ -82,85 +118,52 @@ class BaseOutfit(object):
             condition = "hot"
         return condition
 
-    def _load_clothing_options(self):
-        """ This is the default option for loading up the clothing options.  It can be overridden in child
-            classes if there is other set-up/defaults that child
-        """
-        with open('../data/clothing-options.json') as file_stream:
-            config = json.load(file_stream)
-        if config is None:
-            logging.error("Unable to load the config file clothing-options.json")
-        if self.ACTIVITY_TYPE_KEY == "":
-            raise (NotImplementedError())
-        self._configuration = config[self.ACTIVITY_TYPE_KEY]
-
-    def _get_outfit(self, temp_f, conditions=None):
-        """ This function will return the outfit to suggest, given the temperature and any weather conditions
-            that might be important
-        """
-        if self._configuration is None:
-            self._load_clothing_options()
-
-        # Now let's get the outfit based on the temperature
-        self._condition_temp = self._get_condition_for_temp(temp_f)
-
-        if self.ALWAYS_KEY in self._configuration:
-            self._always = self._configuration[self.ALWAYS_KEY]
-
-        if self._condition_temp in self._configuration:
-            self._outfit = self._configuration[self._condition_temp]
-
-    def _build_generic_from_dict(self, dct, keys=None):
+    @staticmethod
+    def _build_generic_from_list(outfit_items):
         reply = ""
-        following_list = False
-        if keys is None:
-            keys = dct.keys()
-        for k in keys:
-            if k in dct:
-                # Deal with lists
-                reply += " and also " if following_list else ""
-                if type(dct[k]) is list:
-                    if len(reply) > 0:
-                        reply += 'and '
-                    reply += 'either '
-                    reply += ' or '.join(dct[k])
-                    following_list = True
-                # And non-lists
-                elif len(dct[k]) > 0:
-                    following_list = False
-                    reply += dct[k] + ','
-        reply = reply.strip(',')
+        for outfit_item in outfit_items:
+            if outfit_item is not None:
+                reply += f'{outfit_item}, '
+        reply = reply.strip(', ')
         pos = reply.rfind(',')
         # Here we are just taking out the last , to replace it with 'and'
         if pos > 0:
-            reply = reply[:pos] + " and " + reply[pos + 1:]
+            reply = reply[:pos] + " and" + reply[pos + 1:]
             reply = reply.replace("and and", "and")
         return reply
 
     def _build_always_reply(self):
         reply_always = ""
-        if self._always is not None:
-            reply_always += self.always_prefix
-            reply_always += self._build_generic_from_dict(self._always)
+        # if self._always is not None:
+        #     reply_always += self.always_prefix
+        #     reply_always += self._build_generic_from_dict(self._always)
         return reply_always
 
-    def _build_reply_main(self):
+    def _build_reply_main(self, outfit_items):
         reply_clothing = ""
-        if self._outfit is None:
+        if outfit_items is None:
             raise (ValueError())
 
         reply_clothing += self.clothing_prefix
-        reply_clothing += self._build_generic_from_dict(self._outfit, self.BODY_PARTS_KEYS)
+        reply_clothing += \
+            self._build_generic_from_list(outfit_items)
         return reply_clothing
 
-    def build_reply(self, forecast):
-        # Here's where we are going to build reply
-        # A: It looks like it is going to be warm (cold, frigid, chilly, hot, mild, super hot)
-        temp = forecast.feels_like_f
-        self._get_outfit(temp)
-        reply_temperature = self.initial_prefix + self._condition_temp + ". {} degrees.".format(temp)
-        if self._outfit is not None:
-            reply = reply_temperature + ". " + self._build_reply_main() + ". " + self._build_always_reply()
+    def build_reply(self, forecast, duration=0):
+        """ Response to 'What to Wear' for a given forecast
+
+        :param forecast: a forecast object with at least the following fields provided
+        (duration, wind_speed, feels like temperature, and humidity)
+        :param duration: length of time the activity will be going on
+        :return: a human readable string with options of what to wear
+        """
+        items = self.pred_clothing(duration=duration, wind_speed=forecast.wind_speed, feel=forecast.feels_like_f,
+                                   hum=forecast.humidity, light=forecast.is_daylight, item='all')
+        temp_f = forecast.feels_like_f
+        reply_temperature = f'{self.initial_prefix} {self._get_condition_for_temp(temp_f)}' \
+            f'{temp_f} degrees.'
+        if items is not None:
+            reply = f'{reply_temperature}.{self._build_reply_main(items)}. {self._build_always_reply()}'
         else:
             reply = reply_temperature
             reply += "Unfortunately, I don't know how to tell you to dress for that condition."
@@ -193,7 +196,8 @@ class Running(BaseOutfit):
 
 
 r = Running()
-for equip in OUTFIT_COMPONENTS.keys():
-    r.pred_clothing(duration=80, wind_speed=5, feel=45, hum=66, item=equip, light=False)
-    r.pred_clothing(duration=80, wind_speed=5, feel=45, hum=66, item=equip, light=True)
-    r.pred_clothing(duration=30, wind_speed=15, feel=75, hum=0, item=equip, light=True)
+print(r.pred_clothing(duration=30, wind_speed=15, feel=75, hum=0, item=OUTFIT_COMPONENTS, light=True))
+print(r.pred_clothing(duration=30, wind_speed=15, feel=75, hum=0, item='all', light=True))
+print(r.pred_clothing(duration=60, wind_speed=15, feel=35, hum=65, item='all', light=True))
+pred = r.pred_clothing(duration=60, wind_speed=15, feel=35, hum=65, item='all', light=True)
+print(f'{r._build_generic_from_list(pred)}')

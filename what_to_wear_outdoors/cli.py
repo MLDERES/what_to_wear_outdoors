@@ -5,10 +5,12 @@ import sys
 import re
 import click
 from weather_observation import Weather, Forecast
-from clothing_options import Running
+from clothing_options_ml import Running
 import logging
 import textwrap
 
+# TODO: Manage Command Line Arguments
+#  (-u for update model (with Excel), (-f to ask for forecast) (-d for default config) (no flags for walk-through)
 Colors = {'Title': 'blue', 'Description': 'cyan', 'Prompt': 'yellow', 'Error': 'red', 'Output': 'green'}
 
 days_of_the_week = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']

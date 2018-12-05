@@ -5,14 +5,25 @@ import dateutil
 import datetime
 from sklearn import svm
 from sklearn.linear_model import LogisticRegression
-import clothing_options
-from sklearn.feature_extraction import DictVectorizer
-import numpy as np
 import os
-from utility import DATA_PATH, MODEL_PATH, get_model_filename
-from weather_observation import Forecast, Weather
+from .utility import DATA_PATH, get_model_filename
 
 DATA_FILE = os.path.join(DATA_PATH, 'what i wore running.xlsx')
+# create logger with 'spam_application'
+logger = logging.getLogger('update_model')
+logger.setLevel(logging.DEBUG)
+# create file handler which logs even debug messages
+fh = logging.FileHandler('debug.log')
+fh.setLevel(logging.DEBUG)
+# create formatter and add it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.ERROR)
+ch.setFormatter(formatter)
+fh.setFormatter(formatter)
+logger.addHandler(fh)
+logger.addHandler(ch)
 
 #  Import and clean data
 ds_train = pd.read_csv('../data/what i wore running.csv', parse_dates=True, infer_datetime_format=True,

@@ -38,7 +38,7 @@ WIND_DIR_KEY = 'wdir'  # but then we need the 'dir' or 'degrees' key to get it
 WIND_SPEED_KEY = 'wspd'  # also read dictionary of 'english' or 'metric'
 RAIN_CHANCE_KEY = 'pop'  # probability of precipitation
 NULL_VALUE = -999
-
+HUMIDITY_KEY = 'humidity'
 
 class JsonDictionary(dict):
 
@@ -69,6 +69,8 @@ class Forecast:
         self.mth = 1
         self.dow = 'Unknown'
         self.civil_time = '00:00 AM'
+        self.humidity = 0
+        self.is_daylight = True
 
     def __str__(self):
         return f'Forecast for {self.location} ' \
@@ -77,7 +79,8 @@ class Forecast:
                f'\n\tTemperature (feels like): {self.feels_like_f} °F' \
                f'\n\tWind {self.wind_speed} mph from {self.wind_dir}' \
                f'\n\tConditions: {self.condition} ' \
-               f'\n\tChance of precipitation: {self.precip_chance} %'
+            f'\n\tChance of precipitation: {self.precip_chance} %' \
+            f'\n\tHumidity: {self.humidity}'
 
     @staticmethod
     def get_fct_key(d=0, m=0, h=0):
@@ -106,6 +109,7 @@ class Forecast:
         fcast.wind_dir = dct[WIND_DIR_KEY]['dir']
         fcast.wind_speed = self._read_float(dct[WIND_SPEED_KEY][ENG_KEY])
         fcast.precip_chance = self._read_float(dct[RAIN_CHANCE_KEY])
+        fcast.humidity = self._read_float(dct[HUMIDITY_KEY])
 
         return fcast
 
