@@ -5,15 +5,14 @@ import dateutil
 import datetime
 from sklearn import svm
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.pipeline import Pipeline
+import clothing_options
+from sklearn.feature_extraction import DictVectorizer
+import numpy as np
+import os
+from utility import DATA_PATH, MODEL_PATH, get_model_filename
+from weather_observation import Forecast, Weather
 
-
-# custom function taken from
-# https://stackoverflow.com/questions/12432663/what-is-a-clean-way-to-convert-a-string-percent-to-a-float
-def p2f(x):
-    return float(x.strip('%'))
-
+DATA_FILE = os.path.join(DATA_PATH, 'what i wore running.xlsx')
 
 #  Import and clean data
 ds_train = pd.read_csv('../data/what i wore running.csv', parse_dates=True, infer_datetime_format=True,
@@ -79,8 +78,22 @@ for clothing_option in PREDICTION_LABELS:
     #  names for the athlete and the sport
 
 
-def predict_clothing():
-    pass
+#  Just a couple of attempts to see what it turns up
+def pred_clothing(duration, wind_speed, feel, hum, item='shorts', light=True):
+    model_file = open(get_model_filename(item), 'rb')
+    model = pickle.load(model_file)
+    model_file.close()
+    pms = np.array([duration, wind_speed, feel, hum, not light, light]).reshape(1, -1)
+    prediction = model.predict(pms)
+    df = model.decision_function(pms)
+    print(f'{item}: {prediction} Feel:{feel} Humidity:{hum} WS: {wind_speed} Duration:{duration} Light:{light}')
+    return (prediction, df)
+
+
+for equip in PREDICTION_LABELS:
+    pred_clothing(duration=80, wind_speed=5, feel=45, hum=66, item=equip, light=False)
+    pred_clothing(duration=80, wind_speed=5, feel=45, hum=66, item=equip, light=True)
+    pred_clothing(duration=30, wind_speed=15, feel=75, hum=0, item=equip, light=True)
 
 
 # Then we can use the probability to determine if 1 or 0

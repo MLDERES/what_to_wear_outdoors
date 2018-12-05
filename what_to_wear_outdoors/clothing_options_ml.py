@@ -3,15 +3,15 @@ import json
 import random
 from weather_observation import Forecast
 
-__all__ = ['Running']
 
 class BaseOutfit(object):
     """ Base class for different activity options.
-        Reading from JSON,
+        Working off the machine determined models
     """
     ACTIVITY_TYPE_KEY = ""  # Should be overridden in child classes to know where to look in the JSON config
     # Override in other subclasses if this list should be different
-    BODY_PARTS_KEYS = []
+    BODY_PARTS_KEYS = ['calf_sleeves', 'ears_hat', 'gloves', 'heavy_socks', 'jacket',
+                       'long_sleeves', 'short_sleeves', 'shorts', 'sweatshirt', 'tights']
     ALWAYS_KEY = "always"
 
     _configuration = None
@@ -167,4 +167,10 @@ class BaseOutfit(object):
 ################################################
 class Running(BaseOutfit):
     ACTIVITY_TYPE_KEY = "run"
-    BODY_PARTS_KEYS = ["head", "face", "upper_body", "lower_body", "arms", "hands", "legs", "feet"]
+    BODY_PARTS_KEYS = ['calf_sleeves', 'ears_hat', 'gloves', 'heavy_socks', 'jacket',
+                       'long_sleeves', 'short_sleeves', 'shorts', 'sweatshirt', 'tights']
+
+
+CAT_COLS = ['weather_condition', 'is_light', 'wind_dir',
+            'activity_month', 'activity_length']
+NON_CAT_COLS = ['distance', 'duration', 'wind_speed', 'temp', 'feels_like_temp', 'pct_humidity']

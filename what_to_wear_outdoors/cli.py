@@ -1,8 +1,6 @@
-# -*- coding: utf-8 -*-
 
 """Console script for what_to_wear_outdoors."""
 import datetime as dt
-from dateutil.parser import parse
 import sys
 import re
 import click
@@ -10,6 +8,8 @@ from weather_observation import Weather, Forecast
 from clothing_options import Running
 import logging
 import textwrap
+
+__all__ = ['main']
 
 Colors = {'Title': 'blue', 'Description': 'cyan', 'Prompt': 'yellow', 'Error': 'red', 'Output': 'green'}
 
@@ -101,15 +101,6 @@ def figure_out_date(weekday):
     if (dow_target < dow_today):
         days_ahead = + 7
     return dt.datetime.today() + dt.timedelta(days=days_ahead)
-
-
-# def _determine_what_to_wear(dt, t, location):
-#     # Now we can go on
-#     logging.debug("Calling get_weather({},{},{})".format(dt, t, location))
-#     forecast = get_weather_forecast(dt, t, location)
-#     logging.debug("Got a weather forecast.")
-
-
 
 if __name__ == "__main__":
     sys.exit(main())  # pragma: no cover
