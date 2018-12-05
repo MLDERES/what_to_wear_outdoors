@@ -3,6 +3,7 @@ import json
 import random
 from weather_observation import Forecast
 
+__all__ = ['Running']
 
 class BaseOutfit(object):
     """ Base class for different activity options.
@@ -62,7 +63,7 @@ class BaseOutfit(object):
         """ This is the default option for loading up the clothing options.  It can be overridden in child
             classes if there is other set-up/defaults that child
         """
-        with open('clothing-options.json') as file_stream:
+        with open('../data/clothing-options.json') as file_stream:
             config = json.load(file_stream)
         if config is None:
             logging.error("Unable to load the config file clothing-options.json")
@@ -129,7 +130,7 @@ class BaseOutfit(object):
         reply_clothing += self._build_generic_from_dict(self._outfit, self.BODY_PARTS_KEYS)
         return reply_clothing
 
-    def build_reply(self, forecast):
+    def build_reply(self, forecast, duration=0):
         # Here's where we are going to build reply
         # A: It looks like it is going to be warm (cold, frigid, chilly, hot, mild, super hot)
         temp = forecast.feels_like_f

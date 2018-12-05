@@ -35,7 +35,8 @@ setup(
     description="Suggestions for how to dress based on the expected weather during the activity",
     entry_points={
         'console_scripts': [
-            'what_to_wear_outdoors=what_to_wear_outdoors.cli:main',
+            'wtw=what_to_wear_outdoors.cli:main',
+            'update_models=what_to_wear_outdoors.cli:update_model',
         ],
     },
     install_requires=requirements,
