@@ -76,35 +76,10 @@ for clothing_option in PREDICTION_LABELS:
     pickle.dump(model2, open('../models/michael_run.mdl', 'wb'))
     # Save model to the models folder
     #  names for the athlete and the sport
+    model_file = get_model_filename(clothing_option)
+    pickle.dump(model, open(model_file, 'wb'))
 
 
-#  Just a couple of attempts to see what it turns up
-def pred_clothing(duration, wind_speed, feel, hum, item='shorts', light=True):
-    model_file = open(get_model_filename(item), 'rb')
-    model = pickle.load(model_file)
-    model_file.close()
-    pms = np.array([duration, wind_speed, feel, hum, not light, light]).reshape(1, -1)
-    prediction = model.predict(pms)
-    df = model.decision_function(pms)
-    print(f'{item}: {prediction} Feel:{feel} Humidity:{hum} WS: {wind_speed} Duration:{duration} Light:{light}')
-    return (prediction, df)
-
-
-for equip in PREDICTION_LABELS:
-    pred_clothing(duration=80, wind_speed=5, feel=45, hum=66, item=equip, light=False)
-    pred_clothing(duration=80, wind_speed=5, feel=45, hum=66, item=equip, light=True)
-    pred_clothing(duration=30, wind_speed=15, feel=75, hum=0, item=equip, light=True)
-
-
-# Then we can use the probability to determine if 1 or 0
-# model.predict_prob(X_test
-#  For grins we can check the evaluation metrics
-# metrics.accuracy_score()
-# metrics.roc_auc_score()
-#  Finally, to get a cross-validation score
-# scores = cross_val_score
-
-# Then save the model with the Athlete's name_activity
 '''
 Columns as read from data file
 Index(['Athlete', 'Date', 'Time', 'Activity', 'Distance',

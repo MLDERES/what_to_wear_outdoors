@@ -7,6 +7,7 @@ import unittest
 from click.testing import CliRunner
 from what_to_wear_outdoors import cli
 from what_to_wear_outdoors.weather_observation import Weather
+from what_to_wear_outdoors.clothing_options_ml import Running
 
 
 class Test_what_to_wear_outdoors(unittest.TestCase):
@@ -64,3 +65,7 @@ class Test_what_to_wear_outdoors(unittest.TestCase):
         help_result = runner.invoke(cli.main, ['--help'])
         assert help_result.exit_code == 0
         assert '--help  Show this message and exit.' in help_result.output
+
+    def test_predict_clothing(self):
+        r = Running()
+        assert (r.pred_clothing(10, 55, 40, 'shorts', light=True))

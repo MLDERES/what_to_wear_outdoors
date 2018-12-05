@@ -9,5 +9,5 @@ def get_model_name(athlete, sport, item):
     return '_'.join([athlete, sport, item]) + '.mdl'
 
 
-def get_model_filename(item, athlete='michael', sport='run'):
+def get_model_filename(item, athlete='default', sport='run'):
     return os.path.join(MODEL_PATH, get_model_name(athlete, sport, item))

@@ -2,7 +2,7 @@
 """Top-level package for What to Wear Outdoors."""
 import logging
 import os
-from cli import *
+import cli
 from clothing_options import *
 from clothing_options_ml import *
 from update_model import *

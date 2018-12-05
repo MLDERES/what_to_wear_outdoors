@@ -1,20 +1,43 @@
 import logging
 import json
 import random
+import numpy as np
+import pickle
+from utility import get_model_filename
+
 from weather_observation import Forecast
 
-
+OUTFIT_COMPONENTS = {'calf_sleeves': {'name': 'Calf Sleeves'},
+                     'ears_hat': {'name': 'Hat or Ear Cover'},
+                     'gloves': {'name': 'Full fingered gloves'},
+                     'heavy_socks': {'name': 'Wool or insulated socks', 'false_name': 'Regular socks'},
+                     'jacket': {'name': 'Windbreaker'},
+                     'long_sleeves': {'name': 'Long-sleeved shirt'},
+                     'short_sleeves': {'name': 'Short-sleeved shirt'},
+                     'shorts': {'name': 'Shorts'},
+                     'sweatshirt': {'name': 'Sweatshirt/heavier long-sleeves'},
+                     'tights': {'name': 'Tights'}
+                     }
 class BaseOutfit(object):
     """ Base class for different activity options.
         Working off the machine determined models
     """
-    ACTIVITY_TYPE_KEY = ""  # Should be overridden in child classes to know where to look in the JSON config
+    ACTIVITY_TYPE = ""  # Should be overridden in child classes to know where to look in the JSON config
     # Override in other subclasses if this list should be different
-    BODY_PARTS_KEYS = ['calf_sleeves', 'ears_hat', 'gloves', 'heavy_socks', 'jacket',
-                       'long_sleeves', 'short_sleeves', 'shorts', 'sweatshirt', 'tights']
     ALWAYS_KEY = "always"
 
     _configuration = None
+
+    #  Just a couple of attempts to see what it turns up
+    def pred_clothing(self, duration, wind_speed, feel, hum, item='shorts', light=True):
+        model_file = open(get_model_filename(item, sport=self.ACTIVITY_TYPE), 'rb')
+        model = pickle.load(model_file)
+        model_file.close()
+        pms = np.array([duration, wind_speed, feel, hum, not light, light]).reshape(1, -1)
+        prediction = model.predict(pms)
+        df = model.decision_function(pms)
+        print(f'{item}: {prediction} Feel:{feel} Humidity:{hum} WS: {wind_speed} Duration:{duration} Light:{light}')
+        return prediction, df
 
     _response_prefixes = {
         "initial":
@@ -166,11 +189,11 @@ class BaseOutfit(object):
 #
 ################################################
 class Running(BaseOutfit):
-    ACTIVITY_TYPE_KEY = "run"
-    BODY_PARTS_KEYS = ['calf_sleeves', 'ears_hat', 'gloves', 'heavy_socks', 'jacket',
-                       'long_sleeves', 'short_sleeves', 'shorts', 'sweatshirt', 'tights']
+    ACTIVITY_TYPE = "run"
 
 
-CAT_COLS = ['weather_condition', 'is_light', 'wind_dir',
-            'activity_month', 'activity_length']
-NON_CAT_COLS = ['distance', 'duration', 'wind_speed', 'temp', 'feels_like_temp', 'pct_humidity']
+r = Running()
+for equip in OUTFIT_COMPONENTS.keys():
+    r.pred_clothing(duration=80, wind_speed=5, feel=45, hum=66, item=equip, light=False)
+    r.pred_clothing(duration=80, wind_speed=5, feel=45, hum=66, item=equip, light=True)
+    r.pred_clothing(duration=30, wind_speed=15, feel=75, hum=0, item=equip, light=True)

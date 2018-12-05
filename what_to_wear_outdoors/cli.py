@@ -9,8 +9,6 @@ from clothing_options import Running
 import logging
 import textwrap
 
-__all__ = ['main']
-
 Colors = {'Title': 'blue', 'Description': 'cyan', 'Prompt': 'yellow', 'Error': 'red', 'Output': 'green'}
 
 days_of_the_week = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
