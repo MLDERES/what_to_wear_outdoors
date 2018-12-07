@@ -1,14 +1,21 @@
-
 """Console script for what_to_wear_outdoors."""
 import datetime as dt
 import sys
 import re
 import click
-from weather_observation import Weather, Forecast
-from clothing_options_ml import Running
 import logging
 import textwrap
+
+print (f'{__name__} {__package__}')
+# if __name__ == '__main__':
+from weather_observation import Weather, Forecast
+from clothing_options_ml import Running
 from train_model import train
+# else:
+#     from .weather_observation import Weather, Forecast
+#     from .clothing_options_ml import Running
+#     from .train_model import train
+
 
 # TODO: Manage Command Line Arguments
 #  (-u for update model (with Excel), (-f to ask for forecast) (-d for default config) (no flags for walk-through)
@@ -16,35 +23,43 @@ Colors = {'Title': 'blue', 'Description': 'cyan', 'Prompt': 'yellow', 'Error': '
 
 days_of_the_week = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 NOW = dt.datetime.now()
-TITLE = f'#{"-"*18} What to Wear Outdoors {"-"*18}#'
+TITLE = f'#{"-" * 18} What to Wear Outdoors {"-" * 18}#'
 
 ''' Abstract the prompt for activity date/time in case we have to ask more than once to get it right
 '''
+@click.group()
+def cli():
+    pass
+
+@click.command('train')
+#@click.argument('datapath', type=click.File(), default='data/what i wore running.xlsx')
+def train_models():
+    train()
 
 
-def prompt_for_date_time():
-    activity_date = click.prompt(
-        click.style("\n\nWhat day will you be going outside? (Sunday, Monday, etc. "
-                    "also today, tomorrow work as well.) ", fg=Colors['Prompt']),
-        default='today', value_proc=figure_out_date)
-    if (type(activity_date) == str):
-        activity_date = figure_out_date(activity_date)
-    logging.debug(f'Activity date (determined): {activity_date}')
+@click.command('demo')
+@click.option('--duration')
+@click.option('--wind_speed')
+@click.option('--temp')
+@click.option('--humidity')
+def demo_mode():
+    print('got into demo mode')
+    input('press a key to continue')
+    r.pred_clothing(duration=30, wind_speed=15, feel=75, hum=0, item=OUTFIT_COMPONENTS, light=True)
 
-    activity_hour = click.prompt(click.style("What hour of day will you be going outside? "
-                                             "(24 hour format or HH AM/PM)?", fg=Colors['Prompt']),
-                                 default=NOW.hour + 1, value_proc=parse_time)
-    return activity_date.combine(activity_date.date(), dt.time(hour=activity_hour))
-
-    # @click.command()
-
+@click.command('auto_mode')
+# @click.command('--date', type=click.Choice(['today', 'tomorrow']+days_of_the_week))
+# @click.command('--hour')
+# @click.command('--location')
+def auto_mode(date, hour, location):
+    pass
 
 '''
 Here's what I want the interface to look like - 
     wtw --athlete --activity outdoor activity for advice on clothing default='run' options 'run, road, mtb' [cmd]
     [cmd] update - updates the model
             --filename using the filename specified here default='../data/what i wore running.xlsx'
-          test - short-hand to execute without the prompts
+          demo-mode - short-hand to execute without the prompts
             --activity outdoor activity for advice on clothing default='run' options 'run, road, mtb'
             --duration=duration
             --wind_speed
@@ -57,6 +72,7 @@ Here's what I want the interface to look like -
             --loc - location, either zip or [city,state] default=72712   
 '''
 
+
 # @click.option('--date', default=dt.datetime.now().date(), help='date that you will be going outside', prompt=True)
 # @click.option('--day', default=dt.datetime.now().weekday())
 # @click.option('--hour', default=dt.datetime.now().hour, help='hour that you will be going outside', prompt=True,
@@ -68,9 +84,9 @@ Here's what I want the interface to look like -
 # def main(date, hour, zip, activity,day):
 def main():
     click.clear()
-    click.secho(f'#{"-"*(len(TITLE)-2)}#', fg=Colors['Title'])
+    click.secho(f'#{"-" * (len(TITLE) - 2)}#', fg=Colors['Title'])
     click.secho(TITLE, fg=Colors['Title'])
-    click.secho(f'#{"-"*(len(TITLE)-2)}#', fg=Colors['Title'])
+    click.secho(f'#{"-" * (len(TITLE) - 2)}#', fg=Colors['Title'])
     [click.secho(line, fg=Colors['Description'])
      for line in textwrap.wrap('This application is meant to provide an idea'
                                ' of the weather conditions be during your next '
@@ -122,8 +138,20 @@ def figure_out_date(weekday):
     return dt.datetime.today() + dt.timedelta(days=days_ahead)
 
 
-def train_models():
-    train()
+def prompt_for_date_time():
+    activity_date = click.prompt(
+        click.style("\n\nWhat day will you be going outside? (Sunday, Monday, etc. "
+                    "also today, tomorrow work as well.) ", fg=Colors['Prompt']),
+        default='today', value_proc=figure_out_date)
+    if (type(activity_date) == str):
+        activity_date = figure_out_date(activity_date)
+    logging.debug(f'Activity date (determined): {activity_date}')
+
+    activity_hour = click.prompt(click.style("What hour of day will you be going outside? "
+                                             "(24 hour format or HH AM/PM)?", fg=Colors['Prompt']),
+                                 default=NOW.hour + 1, value_proc=parse_time)
+    return activity_date.combine(activity_date.date(), dt.time(hour=activity_hour))
+
 
 if __name__ == "__main__":
     sys.exit(main())  # pragma: no cover

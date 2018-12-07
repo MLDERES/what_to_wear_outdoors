@@ -4,21 +4,25 @@ import logging
 import pickle
 import datetime
 from sklearn.linear_model import LogisticRegression
-import os
+
 from pathlib import Path
-from utility import DATA_PATH, get_model_filename
+from utility import get_model, get_data, get_model_name
 
 
-def train(filename='what i wore running.xlsx', filepath=DATA_PATH):
+def train(sport='Run'):
     """ Create the data models from the input file specified by the filename and filepath
 
     :param filename: name of the xlsx file where the data is stored
-    :param filepath: path to find the data file
+    :param filepath: path to find the data file, if ''
     :return: None
     """
     logger = logging.getLogger(__name__)
-    data_file = os.path.join(filepath, filename)
+    data_file = get_data('what i wore running.xlsx')
     logger.debug(f'Reading data from {data_file}')
+    #TODO: Check for valid values of sport in the request to train
+    valid_sports = ['Run']
+    sport = 'Run'
+    logger.warning(f'The only sports that are supported at this point are {valid_sports}')
     #  Import and clean data
     full_ds = pd.read_excel(data_file, sheet_name='Activity Log',
                             skip_blank_lines=True,
@@ -74,8 +78,8 @@ def train(filename='what i wore running.xlsx', filepath=DATA_PATH):
                 useless_columns[l] = full_ds[l].mean
 
     # TODO: --SPORT FILTER -- Handle the case where the activity and athlete are variable
-    # Filtering specfically more information that one athlete has entered.  Others would be interesting
-    full_train_ds = full_ds[(full_ds.activity == 'Run')].copy()
+    # Filtering specifically more information that one athlete has entered.  Others would be interesting
+    full_train_ds = full_ds[(full_ds.activity == sport)].copy()
     # TODO: --SPORT FILTER -- Remove this when we have taken care to handle multiple athletes
     full_train_ds.drop(['Athlete', 'activity', 'activity_date'], axis='columns', inplace=True)
     # TODO: --SPORT FILTER -- This can go when we have the filter by sport - for columns that don't change values
@@ -92,7 +96,7 @@ def train(filename='what i wore running.xlsx', filepath=DATA_PATH):
     X = train_ds
     for clothing_option in PREDICTION_LABELS:
         logger.info('Building model for {clothing_option}')
-        model = LogisticRegression()
+        model = LogisticRegression(solver='lbfgs')
         y = full_train_ds[clothing_option]
         model.fit(X, y)
         model_score = model.score(X, y)
@@ -103,7 +107,7 @@ def train(filename='what i wore running.xlsx', filepath=DATA_PATH):
         logger.debug(f'{clothing_option}\n{coefficients}')
         # Save model to the models folder
         #  names for the athlete and the sport
-        model_file = get_model_filename(clothing_option)
+        model_file = get_model(get_model_name(clothing_option))
         pickle.dump(model, open(model_file, 'wb'))
         logger.info(f'Model written to {model_file}')
 

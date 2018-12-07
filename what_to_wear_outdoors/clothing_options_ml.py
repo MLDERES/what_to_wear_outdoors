@@ -1,11 +1,13 @@
 import logging
-import json
 import random
 import numpy as np
 import pickle
-from utility import get_model_filename
+#if __name__ == '__main__':
+from utility import get_model_name, get_model
+#else:
+#    from .utility import get_model_name, get_model
 
-from weather_observation import Forecast
+#from weather_observation import Forecast
 
 # TODO: Build response string from ML results
 OUTFIT_COMPONENTS = {'calf_sleeves': {'name': 'calf sleeves'},
@@ -64,7 +66,8 @@ class BaseOutfit(object):
             item_list = [item]
 
         for i in item_list:
-            model_file = open(get_model_filename(i, sport=self.ACTIVITY_TYPE), 'rb')
+            model_name = get_model_name(item=i, sport=self.ACTIVITY_TYPE)
+            model_file = open(get_model(model_name), 'rb')
             model = pickle.load(model_file)
             model_file.close()
             pms = np.array([duration, wind_speed, feel, hum, not light, light]).reshape(1, -1)
@@ -168,7 +171,7 @@ class BaseOutfit(object):
     # These are defined as properties so that they could be overridden in subclasses if desired
     @property
     def initial_prefix(self):
-        return random.choice(self._response_prefixes["initial"]) + "it is going to be "
+        return random.choice(self._response_prefixes["initial"]) + " it is going to be"
 
     @property
     def clothing_prefix(self):

@@ -1,6 +1,7 @@
 pandas
 numpy
 requests
-dotenv
-dateutil
+python-dotenv
 click
+sklearn
+

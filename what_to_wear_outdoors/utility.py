@@ -1,13 +1,15 @@
-import os
+from pathlib import Path
 
-DATA_PATH = os.path.relpath('../data')
-MODEL_PATH = os.path.relpath('../models')
+_ROOT = Path(__file__).parent
 
 
-# TODO: Fix this up so we are more assurred of where the models are coming from
-def get_model_name(athlete, sport, item):
+def get_data(path):
+    return _ROOT / 'data' / path
+
+
+def get_model(path):
+    return _ROOT / 'models' / path
+
+
+def get_model_name(item, athlete='default', sport='run'):
     return '_'.join([athlete, sport, item]) + '.mdl'
-
-
-def get_model_filename(item, athlete='default', sport='run'):
-    return os.path.join(MODEL_PATH, get_model_name(athlete, sport, item))

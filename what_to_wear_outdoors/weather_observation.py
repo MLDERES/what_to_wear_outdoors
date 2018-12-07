@@ -10,6 +10,7 @@ __all__ = ['Forecast', 'Weather']
 # TODO: Put this back so that we aren't shipping the API key with the code
 dotenv.load_dotenv()
 WU_API_KEY = os.getenv("WU_API_KEY")
+WU_API_KEY = '7d65568686ff9c25'
 if WU_API_KEY is None:
     raise EnvironmentError(
         "The environment variable WU_API_KEY is required to run this program.")

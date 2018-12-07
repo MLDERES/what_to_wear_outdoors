@@ -12,17 +12,22 @@ with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
 requirements = ['Click>=6.0',
-                'dotenv' ]
+                'python-dotenv',
+                'requests',
+                'sklearn',
+                'pandas',
+                'xlrd',
+                ]
 
-setup_requirements = [ ]
-
-test_requirements = [ ]
+# setup_requirements = [ ]
+#
+# test_requirements = [ ]
 
 setup(
     author="Michael Dereszynski",
     author_email='mlderes@hotmail.com',
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Natural Language :: English',
@@ -31,12 +36,15 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Environment :: Console',
     ],
     description="Suggestions for how to dress based on the expected weather during the activity",
     entry_points={
         'console_scripts': [
             'wtw=what_to_wear_outdoors.cli:main',
-            'update_models=what_to_wear_outdoors.cli:update_model',
+            'wtw-train=what_to_wear_outdoors.cli:train_models',
+            'wtw-demo=what_to_wear_outdoors.cli:demo_mode',
+            'wtw-auto=what_to_wear_outdoors.cli:auto_mode',
         ],
     },
     install_requires=requirements,
@@ -46,9 +54,12 @@ setup(
     keywords='what_to_wear_outdoors',
     name='what_to_wear_outdoors',
     packages=find_packages(include=['what_to_wear_outdoors']),
-    setup_requires=setup_requirements,
+    package_data= {
+        'what_to_wear_outdoors': ['data/*','models/*']
+    },
+    #setup_requires=setup_requirements,
     test_suite='tests',
-    tests_require=test_requirements,
+    #tests_require=test_requirements,
     url='https://github.com/mlderes/what_to_wear_outdoors',
     version='0.1.0',
     zip_safe=False,
