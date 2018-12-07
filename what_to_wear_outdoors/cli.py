@@ -8,7 +8,7 @@ import textwrap
 
 from what_to_wear_outdoors.clothing_options import Running2
 
-if __name__ == '__main__':
+if __name__ == '__main__' or __package__ == '':
     from weather_observation import Weather, Forecast
     from clothing_options_ml import Running
     from train_model import train
@@ -70,32 +70,42 @@ def train_models():
 
 
 @click.command('demo')
-# @click.option('--duration', default=30, help='number of minutes you will be out')
-# @click.option('--windspeed', default=0, help='windspeed (mph) at time you will be out')
-# @click.option('--temp', default=70, help='forecast temperature for activity')
-# @click.option('--humidity', default=50.0, help='forecast humidity')
+@click.option('--duration', default=30, help='number of minutes you will be out')
+@click.option('--windspeed', default=0, help='windspeed (mph) at time you will be out')
+@click.option('--temp', default=70, help='forecast temperature for activity')
+@click.option('--humidity', default=50.0, help='forecast humidity')
 def demo_mode(duration, windspeed, temp, humidity):
-    print('got into demo mode')
-#     input('press a key to continue')
-#     r = Running()
-#     prediction = r.pred_clothing(duration=duration, wind_speed=windspeed,
-#                                  feel=temp, hum=humidity, item=OUTFIT_COMPONENTS, light=True)
-#     [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(prediction)]
+    click.secho(f'\nRecommendations for forecast\n\tTemp:{temp}'
+                f'\n\tWind:{windspeed}\n\tHumidity:{humidity}\n\tActivity Duration:{duration}\n')
+
+    r = Running()
+    f = Forecast()
+    f.humidity= humidity
+    f.feels_like_f = temp
+    f.wind_speed = windspeed
+    f.is_daylight = True
+    reply = r.build_reply(f,duration=duration)
+    # prediction = r.pred_clothing(duration=duration, wind_speed=windspeed,
+    #                              feel=temp, hum=humidity, light=True)
+    #print(reply)
+    [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(reply)]
 
 
 @click.command('auto')
-# @click.command('--day', type=click.Choice(valid_dow_value), prompt=True)
-# @click.command('--hour', value_proc=parse_time)
-# @click.command('--location')
-def auto_mode(day, hour, location):
+#@click.command('--dow')
+#@click.command('--hour')
+#@click.command('--location')
+def auto_mode(dow, hour, location):
     print('got into auto_mode')
-    # w = Weather()
-    # logging.debug(f'Forecast (calculated): {forecast_dt}')
-    # fct = w.get_forecast(forecast_dt, activity_location)
-    # print(fct)
-    # running = Running()
-    # print('\n')
-    # [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(running.build_reply(fct))]
+    input()
+    w = Weather()
+    forecast_dt = parse_time(hour)
+    logging.debug(f'Forecast (calculated): {forecast_dt}')
+    fct = w.get_forecast(forecast_dt, location)
+    print(fct)
+    running = Running()
+    print('\n')
+    [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(running.build_reply(fct))]
 
 
 '''
@@ -117,6 +127,7 @@ Here's what I want the interface to look like -
 '''
 
 
+@click.command('main')
 # @click.option('--date', default=dt.datetime.now().date(), help='date that you will be going outside', prompt=True)
 # @click.option('--day', default=dt.datetime.now().weekday())
 # @click.option('--hour', default=dt.datetime.now().hour, help='hour that you will be going outside', prompt=True,
@@ -164,11 +175,9 @@ def main():
 
 def prompt_for_date_time():
     activity_date = click.prompt(
-        click.style("\n\nWhat day will you be going outside? (Sunday, Monday, etc. "
-                    "also today, tomorrow work as well.) ", fg=Colors['Prompt']),
-        default='today', value_proc=figure_out_date)
-    if (type(activity_date) == str):
-        activity_date = figure_out_date(activity_date)
+        click.style("\n\nWhat day will you be going outside?", fg=Colors['Prompt']),
+        default='today', type=click.Choice(valid_dow_value))
+    activity_date = figure_out_date(activity_date)
     logging.debug(f'Activity date (determined): {activity_date}')
 
     activity_hour = click.prompt(click.style("What hour of day will you be going outside? "

@@ -1,9 +1,11 @@
 import logging
 import random
+import warnings
+
 import numpy as np
 import pickle
 
-if __name__ == '__main__':
+if __package__ == '' or __name__ == '__main__':
     from utility import get_model_name, get_model
 else:
     from . utility import get_model_name, get_model
@@ -11,16 +13,16 @@ else:
 #from weather_observation import Forecast
 
 # TODO: Build response string from ML results
-OUTFIT_COMPONENTS = {'calf_sleeves': {'name': 'calf sleeves'},
-                     'ears_hat': {'name': 'ear covers'},
-                     'gloves': {'name': 'full fingered gloves'},
-                     'heavy_socks': {'name': 'wool or insulated socks', 'false_name': 'regular socks'},
-                     'jacket': {'name': 'a windbreaker'},
-                     'long_sleeves': {'name': 'a long-sleeved shirt'},
+OUTFIT_COMPONENTS = {'long_sleeves': {'name': 'a long-sleeved shirt'},
                      'short_sleeves': {'name': 'a short-sleeved shirt'},
                      'shorts': {'name': 'shorts'},
+                     'calf_sleeves': {'name': 'calf sleeves'},
+                     'ears_hat': {'name': 'ear covers'},
+                     'gloves': {'name': 'full fingered gloves'},
+                     'jacket': {'name': 'a windbreaker'},
                      'sweatshirt': {'name': 'a sweatshirt or heavier long-sleeve outwear'},
-                     'tights': {'name': 'tights'}
+                     'tights': {'name': 'tights'} ,
+                     'heavy_socks': {'name': 'wool or insulated socks', 'false_name': 'regular socks'},
                      }
 # Get the list of keys to the clothing dictionary as a list for convenience
 CLOTHING_KEYS = [*OUTFIT_COMPONENTS.keys()]
@@ -69,7 +71,9 @@ class BaseOutfit(object):
         for i in item_list:
             model_name = get_model_name(item=i, sport=self.ACTIVITY_TYPE)
             model_file = open(get_model(model_name), 'rb')
-            model = pickle.load(model_file)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                model = pickle.load(model_file)
             model_file.close()
             pms = np.array([duration, wind_speed, feel, hum, not light, light]).reshape(1, -1)
             prediction = model.predict(pms)

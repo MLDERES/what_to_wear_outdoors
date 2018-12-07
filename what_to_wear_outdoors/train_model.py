@@ -6,7 +6,7 @@ import datetime
 from sklearn.linear_model import LogisticRegression
 from pathlib import Path
 
-if __name__ == '__main__':
+if __package__ == '' or __name__ == '__main__':
     from utility import get_model, get_data, get_model_name
 else:
     from .utility import get_model, get_data, get_model_name
