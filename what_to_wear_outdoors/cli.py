@@ -19,6 +19,25 @@ else:
 
 # TODO: Manage Command Line Arguments
 #  (-u for update model (with Excel), (-f to ask for forecast) (-d for default config) (no flags for walk-through)
+
+'''
+Here's what I want the interface to look like - 
+    wtw --athlete --activity outdoor activity for advice on clothing default='run' options 'run, road, mtb' [cmd]
+    [cmd] update - updates the model
+            --filename using the filename specified here default='../data/what i wore running.xlsx'
+          demo-mode - short-hand to execute without the prompts
+            --activity outdoor activity for advice on clothing default='run' options 'run, road, mtb'
+            --duration=duration
+            --wind_speed
+            --feel - feels like temperature
+            --humidity
+            --daylight - is there daylight or not options='true/false' default true
+          predict - this is also shorthand, but gets the forecast
+            --date - Sunday, Monday, etc or today, tomorrow default='today'
+            --time - hour of the day can be 24hr time, 10:00, 10am, 10PM, 22:00, 22 default='top of the next hour'
+            --loc - location, either zip or [city,state] default=72712   
+'''
+
 Colors = {'Title': 'blue', 'Description': 'cyan', 'Prompt': 'yellow', 'Error': 'red', 'Output': 'green',
           'Alternate_Output': 'cyan'}
 
@@ -53,11 +72,6 @@ def figure_out_date(weekday):
         days_ahead = + 7
     return dt.datetime.today() + dt.timedelta(days=days_ahead)
 
-
-''' Abstract the prompt for activity date/time in case we have to ask more than once to get it right
-'''
-
-
 @click.group()
 def cli():
     pass
@@ -72,9 +86,18 @@ def train_models():
 @click.command('demo')
 @click.option('--duration', default=30, help='number of minutes you will be out')
 @click.option('--windspeed', default=0, help='windspeed (mph) at time you will be out')
-@click.option('--temp', default=70, help='forecast temperature for activity')
+@click.option('--temp', default=75, help='forecast temperature for activity')
 @click.option('--humidity', default=50.0, help='forecast humidity')
 def demo_mode(duration, windspeed, temp, humidity):
+    '''
+    This mode is used to specfic the forecast rather than to look up a forecast and depend on the results.
+
+    :param duration: number of minutes that the activity will last
+    :param windspeed: wind speed (mph) at the time of the activity
+    :param temp: forecasted (feels like) temperature (F)
+    :param humidity: percent humidty
+    :return: None
+    '''
     click.secho(f'\nRecommendations for forecast\n\tTemp:{temp}'
                 f'\n\tWind:{windspeed}\n\tHumidity:{humidity}\n\tActivity Duration:{duration}\n')
 
@@ -85,9 +108,6 @@ def demo_mode(duration, windspeed, temp, humidity):
     f.wind_speed = windspeed
     f.is_daylight = True
     reply = r.build_reply(f,duration=duration)
-    # prediction = r.pred_clothing(duration=duration, wind_speed=windspeed,
-    #                              feel=temp, hum=humidity, light=True)
-    #print(reply)
     [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(reply)]
 
 
@@ -108,35 +128,8 @@ def auto_mode(dow, hour, location):
     [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(running.build_reply(fct))]
 
 
-'''
-Here's what I want the interface to look like - 
-    wtw --athlete --activity outdoor activity for advice on clothing default='run' options 'run, road, mtb' [cmd]
-    [cmd] update - updates the model
-            --filename using the filename specified here default='../data/what i wore running.xlsx'
-          demo-mode - short-hand to execute without the prompts
-            --activity outdoor activity for advice on clothing default='run' options 'run, road, mtb'
-            --duration=duration
-            --wind_speed
-            --feel - feels like temperature
-            --humidity
-            --daylight - is there daylight or not options='true/false' default true
-          predict - this is also shorthand, but gets the forecast
-            --date - Sunday, Monday, etc or today, tomorrow default='today'
-            --time - hour of the day can be 24hr time, 10:00, 10am, 10PM, 22:00, 22 default='top of the next hour'
-            --loc - location, either zip or [city,state] default=72712   
-'''
-
 
 @click.command('main')
-# @click.option('--date', default=dt.datetime.now().date(), help='date that you will be going outside', prompt=True)
-# @click.option('--day', default=dt.datetime.now().weekday())
-# @click.option('--hour', default=dt.datetime.now().hour, help='hour that you will be going outside', prompt=True,
-#               type=click.IntRange(0-23))
-# @click.option('--activity', type=click.Choice(['run','bike']), prompt=True,
-#               help='the type of activity you will be doing outside')
-# @click.option('--zip', help='the zipcode of the location for your activity',
-#             prompt='The zipcode for the location where you''ll be going out?', type=click.IntRange(0-99999))
-# def main(date, hour, zip, activity,day):
 def main():
     click.clear()
     click.secho(f'#{"-" * (len(TITLE) - 2)}#', fg=Colors['Title'])
@@ -173,7 +166,11 @@ def main():
     click.secho(f'\n\n#{"-" * 18}STANDARD OUTPUT{"-" * 18}#', fg=Colors['Alternate_Output'])
     [click.secho(li, fg=Colors['Alternate_Output']) for li in textwrap.wrap(running2.build_reply(fct))]
 
+
 def prompt_for_date_time():
+    '''  Abstract the prompt for activity date/time in case we have to ask more than once to get it right
+    :return: a representation of the date and time in UTC format
+    '''
     activity_date = click.prompt(
         click.style("\n\nWhat day will you be going outside?", fg=Colors['Prompt']),
         default='today', type=click.Choice(valid_dow_value))
