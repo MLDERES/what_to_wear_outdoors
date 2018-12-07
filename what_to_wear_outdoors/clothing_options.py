@@ -1,11 +1,13 @@
 import logging
 import json
 import random
-from weather_observation import Forecast
+from .weather_observation import Forecast
+from .utility import get_data
 
-__all__ = ['Running']
+__all__ = ['Running2']
 
-class BaseOutfit(object):
+
+class BaseOutfit2(object):
     """ Base class for different activity options.
         Reading from JSON,
     """
@@ -63,7 +65,7 @@ class BaseOutfit(object):
         """ This is the default option for loading up the clothing options.  It can be overridden in child
             classes if there is other set-up/defaults that child
         """
-        with open('../data/clothing-options.json') as file_stream:
+        with open(get_data('clothing-options.json')) as file_stream:
             config = json.load(file_stream)
         if config is None:
             logging.error("Unable to load the config file clothing-options.json")
@@ -165,6 +167,6 @@ class BaseOutfit(object):
 # Subclassing clothing option for "Running"
 #
 ################################################
-class Running(BaseOutfit):
+class Running2(BaseOutfit2):
     ACTIVITY_TYPE_KEY = "run"
     BODY_PARTS_KEYS = ["head", "face", "upper_body", "lower_body", "arms", "hands", "legs", "feet"]

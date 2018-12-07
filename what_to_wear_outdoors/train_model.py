@@ -4,9 +4,12 @@ import logging
 import pickle
 import datetime
 from sklearn.linear_model import LogisticRegression
-
 from pathlib import Path
-from utility import get_model, get_data, get_model_name
+
+if __name__ == '__main__':
+    from utility import get_model, get_data, get_model_name
+else:
+    from .utility import get_model, get_data, get_model_name
 
 
 def train(sport='Run'):

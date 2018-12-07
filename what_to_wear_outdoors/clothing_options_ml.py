@@ -2,10 +2,11 @@ import logging
 import random
 import numpy as np
 import pickle
-#if __name__ == '__main__':
-from utility import get_model_name, get_model
-#else:
-#    from .utility import get_model_name, get_model
+
+if __name__ == '__main__':
+    from utility import get_model_name, get_model
+else:
+    from . utility import get_model_name, get_model
 
 #from weather_observation import Forecast
 
