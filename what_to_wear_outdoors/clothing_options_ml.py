@@ -68,6 +68,8 @@ class BaseOutfit(object):
         else:
             item_list = [item]
 
+        hum = hum if hum < 1 else hum/100
+
         for i in item_list:
             model_name = get_model_name(item=i, sport=self.ACTIVITY_TYPE)
             model_file = open(get_model(model_name), 'rb')
@@ -87,15 +89,17 @@ class BaseOutfit(object):
     _response_prefixes = {
         "initial":
             ["It looks like",
-             "Oh my",
-             "Well",
+             "Oh my, look like",
+             "Well, ",
              "Temperature seems",
              "Weather underground says"],
         "clothing":
             ["I suggest wearing",
              "Based on the weather conditions, you should consider",
              "Looks like today would be a good day to wear",
-             "If I were going out I'd wear"],
+             "If I were going out I'd wear",
+             "You should probably wear",
+             "Consider wearing",],
         ALWAYS_KEY:
             ["Of course, you should always",
              "It would be insane not to wear",

@@ -99,7 +99,7 @@ def train(sport='Run'):
     X = train_ds
     for clothing_option in PREDICTION_LABELS:
         logger.info('Building model for {clothing_option}')
-        model = LogisticRegression(solver='lbfgs')
+        model = LogisticRegression(solver='liblinear')
         y = full_train_ds[clothing_option]
         model.fit(X, y)
         model_score = model.score(X, y)

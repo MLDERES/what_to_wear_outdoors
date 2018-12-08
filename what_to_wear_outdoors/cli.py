@@ -98,8 +98,9 @@ def demo_mode(duration, windspeed, temp, humidity):
     :param humidity: percent humidty
     :return: None
     '''
-    click.secho(f'\nRecommendations for forecast\n\tTemp:{temp}'
-                f'\n\tWind:{windspeed}\n\tHumidity:{humidity}\n\tActivity Duration:{duration}\n')
+    hum_pct = humidity if humidity < 1 else humidity / 100
+    click.secho(f'\nRecommendation for forecast\n\tTemp:{temp}'
+                f'\n\tWind:{windspeed}\n\tHumidity:{hum_pct*100}%\n\tActivity Duration:{duration}\n')
 
     r = Running()
     f = Forecast()
