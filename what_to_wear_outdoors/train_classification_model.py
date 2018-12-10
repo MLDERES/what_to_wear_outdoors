@@ -5,7 +5,7 @@ import pickle
 import datetime
 from sklearn.linear_model import LogisticRegression
 from pathlib import Path
-
+import numpy as np
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.tree import DecisionTreeClassifier
 
@@ -20,63 +20,97 @@ logger = logging.getLogger(__name__)
 def train(sport='Run'):
     """ Create the data models from the input file specified by the filename and filepath
 
-    :param filename: name of the xlsx file where the data is stored
-    :param filepath: path to find the data file, if ''
+    :param sport:
     :return: None
+
+    Athlete    object
+    Date    datetime64[ns]
+    Time    object
+    Activity    object
+    Distance    float64
+    Length of activity(min)    int64
+    Condition    object
+    Light    bool
+    Wind    int64
+    Wind Dir   object
+    Temp    int64
+    Feels like int64
+    Humidity    float64
+    Feel    object
+    Notes    object
+    Hat - Ears    bool
+    Outer Layer    object
+    Base Layer    object
+    Arm Warmers   bool
+    Jacket    object
+    Gloves    bool
+    LowerBody    object
+    Heavy Socks  bool
+    Shoe Covers  bool
+    Face Cover   bool
+    Unnamed: 25  float64
+    Unnamed: 26  object
+    Unnamed: 27 float64
     """
     data_file = get_data('what i wore running.xlsx')
+
     logger.debug(f'Reading data from {data_file}')
-    #TODO: Check for valid values of sport in the request to train
+    # TODO: Check for valid values of sport in the request to train
     valid_sports = ['Run']
-    sport = 'Run'
     logger.warning(f'The only sports that are supported at this point are {valid_sports}')
     #  Import and clean data
-    full_ds = pd.read_excel(data_file, sheet_name='Activity Log',
+    full_ds = pd.read_excel(data_file, sheet_name='Activity Log2',
                             skip_blank_lines=True,
                             true_values=['Yes', 'yes', 'y'], false_values=['No', 'no', 'n'],
-                            dtype={'Time': datetime.time})
+                            dtype={'Time': datetime.time}, usecols='A:Y')
     full_ds.dropna(how='all', inplace=True)
     full_ds.fillna(value=False, inplace=True)
     logger.debug(f'Data file shape: {data_file}')
 
-    full_ds.rename({'Length of activity (min)': 'duration', 'Wind': 'wind_speed', 'Wind Dir': 'wind_dir',
-                    'Date': 'activity_date', 'Distance': 'distance', 'Condition': 'weather_condition',
-                    'Activity': 'activity', 'Light': 'is_light', 'Temp': 'temp', 'Feels like': 'feels_like_temp',
+    full_ds.rename({'Date': 'activity_date', 'Time': 'activity_hour', 'Activity': 'activity', 'Distance': 'distance',
+                    'Length of activity (min)': 'duration', 'Condition': 'weather_condition', 'Light': 'is_light',
+                    'Wind': 'wind_speed', 'Wind Dir': 'wind_dir', 'Temp': 'temp', 'Feels like': 'feels_like_temp',
                     'Humidity': 'pct_humidity',
-                    'Long Sleeves': 'long_sleeves', 'Short Sleeve': 'short_sleeves', 'Arm Warmers': 'arm_warmers',
-                    'SweatShirt': 'sweatshirt', 'Jacket': 'jacket', 'Tights': 'tights', 'Shorts': 'shorts',
-                    'Gloves': 'gloves', 'Calf Sleeves': 'calf_sleeves', 'Shoe Covers': 'shoe_cover',
-                    'Face Cover': 'face_cover', 'Heavy Socks': 'heavy_socks', 'Time': 'activity_hour'},
-                   axis='columns', inplace=True)
+                    'Hat-Ears': 'ears_hat', 'Outer Layer': 'outer_layer', 'Base Layer': 'base_layer',
+                    'Arm Warmers': 'arm_warmers', 'Jacket': 'jacket', 'Gloves': 'gloves',
+                    'LowerBody': 'lower_body', 'Shoe Covers': 'shoe_cover', 'Face Cover': 'face_cover',
+                    'Heavy Socks': 'heavy_socks', },
+                   axis='columns', inplace=True, )
 
     # Now deal with the special cases
-    full_ds['ears_hat'] = full_ds['Ears'] | full_ds['Hat']
     full_ds.drop(['Feel', 'Notes', 'Hat', 'Ears', 'activity_hour'], axis='columns', inplace=True, errors='ignore')
 
     # Establish the categorical variables
     full_ds['activity_month'] = full_ds['activity_date'].dt.month.astype('category')
     full_ds['activity_length'] = pd.cut(full_ds.duration, bins=[0, 31, 61, 121, 720],
                                         labels=['short', 'medium', 'long', 'extra long'])
-    full_ds['activity'] = full_ds['activity'].astype('category')
-    full_ds['weather_condition'] = full_ds['weather_condition'].astype('category')
-    full_ds['wind_dir'] = full_ds['wind_dir'].astype('category')
-    tights_cat_type = CategoricalDtype(categories=["None", "Capri", "Long", "Insulated"], ordered=True)
-    full_ds['tights'] = full_ds['tights'].astype(tights_cat_type)
+    ALL_CATEGORICAL_COLUMNS = ['activity',
+                               'weather_condition',
+                               'wind_dir',
+                               'outer_layer',
+                               'base_layer',
+                               'jacket',
+                               'lower_body']
+    for c in ALL_CATEGORICAL_COLUMNS:
+        full_ds[c] = full_ds[c].astype('category')
+
+    leg_categories = ['Shorts', 'Shorts-calf cover', 'Capri', 'Long tights', 'Insulated tights']
+    layer_categories = ['None', 'Sleeveless', 'Short-sleeve', 'Long-sleeve', 'Sweatshirt-Heavy']
+    full_ds['lower_body'] = full_ds['lower_body'].astype(CategoricalDtype(categories=leg_categories, ordered=True))
+    full_ds['outer_layer'] = full_ds['outer_layer'].astype(CategoricalDtype(categories=layer_categories, ordered=True))
+    full_ds['base_layer'] = full_ds['base_layer'].astype(CategoricalDtype(categories=layer_categories, ordered=True))
 
     # Categorical data column names
     # TODO: When we get good enough add in a few more categorical variables
     CAT_COLS = ['is_light']  # , 'activity_length','wind_dir', 'weather_condition','activity_month'
 
-    NON_CAT_COLS = ['duration', 'wind_speed', 'feels_like_temp', 'pct_humidity']  # 'distance','temp',
+    NON_CAT_COLS = ['duration', 'wind_speed', 'feels_like_temp', 'pct_humidity'] #,'distance' 'temp']
     ALL_FACTOR_COLS = CAT_COLS + NON_CAT_COLS
-    PREDICTION_LABELS = ['long_sleeves', 'short_sleeves', 'sweatshirt', 'jacket', 'gloves', 'shorts', 'tights',
-                         'calf_sleeves', 'ears_hat', 'heavy_socks',
-                         # Removing for now as they haven't yet been used for running
-                         # 'arm_warmers','face_cover','shoe_cover',
+    PREDICTION_LABELS = ['ears_hat', 'outer_layer', 'base_layer',
+                         'jacket', 'gloves', 'lower_body','heavy_socks',
+                         #'arm_warmers', 'face_cover', 'shoe_cover' - not used for running
                          ]
 
-    # TODO: --SPORT FILTER -- Handle the case where the activity and athlete are variable
-    # Filtering specifically more information that one athlete has entered.  Others would be interesting
     full_train_ds = full_ds[(full_ds.activity == sport)].copy()
     # TODO: --SPORT FILTER -- Remove this when we have taken care to handle multiple athletes
     full_train_ds.drop(['Athlete', 'activity', 'activity_date'], axis='columns', inplace=True)
@@ -84,7 +118,7 @@ def train(sport='Run'):
     full_train_ds.drop(['shoe_cover', 'face_cover', 'arm_warmers'], axis='columns', inplace=True)
 
     train_ds = full_train_ds[ALL_FACTOR_COLS]
-    train_ds = pd.get_dummies(train_ds, columns=CAT_COLS)
+    #train_ds = pd.get_dummies(train_ds, columns=CAT_COLS)
 
     # Finally, we are going to be able to establish the model.
     # TODO: Does it make sense to put the prediction labels in order such that once we predict a label it becomes part
@@ -92,22 +126,46 @@ def train(sport='Run'):
     # TODO: This can be done by creating a multivariate logistic regression or by doing a cross-product of all the
     #   combinations and then using these combinations as a single multi-class regression predictor
     X = train_ds
-    for clothing_option in PREDICTION_LABELS:
-        logger.info('Building model for {clothing_option}')
-        model = LogisticRegression(solver='liblinear')
-        y = full_train_ds[clothing_option]
-        model.fit(X, y)
-        model_score = model.score(X, y)
-        logger.debug(f'Score for {clothing_option}: {model_score}')
-        c = list(zip(list(X), model.coef_[0]))
-        coefficients = pd.DataFrame(c)
-        # logging.debug(coefficients)
-        logger.debug(f'{clothing_option}\n{coefficients}')
-        # Save model to the models folder
-        #  names for the athlete and the sport
-        model_file = get_model(get_model_name(clothing_option))
-        pickle.dump(model, open(model_file, 'wb'))
-        logger.info(f'Model written to {model_file}')
+    #y = full_train_ds[PREDICTION_LABELS].values
+
+    y = np.vstack((full_train_ds['ears_hat'].values,
+                   full_train_ds['gloves'].values)).T
+    #y = np.concatenate()
+    y1 = full_train_ds[['ears_hat', 'gloves', 'heavy_socks']].values
+    y2 = full_train_ds[['outer_layer', 'base_layer', 'jacket', 'lower_body']]
+    print(f'Shape of y: {y.shape}, Shape of y1 = {y1.shape}')
+
+
+    # https://scikit-learn.org/stable/modules/multiclass.html
+    forest = DecisionTreeClassifier(max_depth=4)
+    mt_forest = MultiOutputClassifier(forest, n_jobs=-1)
+    mt_forest.fit(X, y1)
+    forest.fit(X, y1)
+
+    #['is_light', ''duration', 'wind_speed', 'feels_like_temp', 'pct_humidity']
+    pred_X = [[True, 30, 10, 25, .8], [True, 40, 10, 60, .8]]
+    print(f'Ears, Gloves, Heavy Socks {mt_forest.predict(pred_X)}')
+    print(f'Ears, Gloves, Heavy Socks {forest.predict(pred_X)}')
+
+    mt_forest.fit(X, y2)
+    print(f'Outer, Base, Jacket, Lower Body {mt_forest.predict(pred_X)}')
+
+    # for clothing_option in PREDICTION_LABELS:
+    #     logger.info('Building model for {clothing_option}')
+    #     model = LogisticRegression(solver='liblinear')
+    #     y = full_train_ds[clothing_option]
+    #     model.fit(X, y)
+    #     model_score = model.score(X, y)
+    #     logger.debug(f'Score for {clothing_option}: {model_score}')
+    #     c = list(zip(list(X), model.coef_[0]))
+    #     coefficients = pd.DataFrame(c)
+    #     # logging.debug(coefficients)
+    #     logger.debug(f'{clothing_option}\n{coefficients}')
+    #     # Save model to the models folder
+    #     #  names for the athlete and the sport
+    #     model_file = get_model(get_model_name(clothing_option))
+    #     pickle.dump(model, open(model_file, 'wb'))
+    #     logger.info(f'Model written to {model_file}')
 
     '''
     Columns as read from data file
@@ -147,6 +205,7 @@ def train(sport='Run'):
     activity_month             category
     activity_length            category
     '''
+
 
 if __name__ == '__main__':
     # create logger with 'spam_application'

@@ -11,11 +11,11 @@ from what_to_wear_outdoors.clothing_options import Running2
 if __name__ == '__main__' or __package__ == '':
     from weather_observation import Weather, Forecast
     from clothing_options_ml import Running
-    from train_model import train
+    from train_model import LogisticModelCreator, ClassifierModelCreator
 else:
     from .weather_observation import Weather, Forecast
     from .clothing_options_ml import Running
-    from .train_model import train
+    from .train_model import LogisticModelCreator, ClassifierModelCreator
 
 # TODO: Manage Command Line Arguments
 #  (-u for update model (with Excel), (-f to ask for forecast) (-d for default config) (no flags for walk-through)
@@ -80,7 +80,9 @@ def cli():
 @click.command('train_models')
 # @click.argument('datapath', type=click.File(), default='data/what i wore running.xlsx')
 def train_models():
-    train()
+    #TODO: Support using more than one model type to train with
+    mc = LogisticModelCreator()
+    mc.train()
 
 
 @click.command('demo')
