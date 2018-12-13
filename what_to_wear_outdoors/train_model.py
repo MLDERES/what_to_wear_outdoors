@@ -10,9 +10,9 @@ from sklearn.multioutput import MultiOutputClassifier
 from sklearn.tree import DecisionTreeClassifier
 
 if __package__ == '' or __name__ == '__main__':
-    from utility import get_model, get_data, get_model_name
+    from utility import get_model, get_data_path, get_model_name
 else:
-    from .utility import get_model, get_data, get_model_name
+    from .utility import get_model, get_data_path, get_model_name
 
 logger = logging.getLogger(__name__)
 

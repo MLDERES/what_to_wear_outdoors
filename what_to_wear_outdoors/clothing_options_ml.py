@@ -8,9 +8,9 @@ import pickle
 if __package__ == '' or __name__ == '__main__':
     from utility import get_model_name, get_model
 else:
-    from . utility import get_model_name, get_model
+    from .utility import get_model_name, get_model
 
-#from weather_observation import Forecast
+# from weather_observation import Forecast
 
 # TODO: Build response string from ML results
 OUTFIT_COMPONENTS = {'long_sleeves': {'name': 'a long-sleeved shirt'},
@@ -21,11 +21,13 @@ OUTFIT_COMPONENTS = {'long_sleeves': {'name': 'a long-sleeved shirt'},
                      'gloves': {'name': 'full fingered gloves'},
                      'jacket': {'name': 'a windbreaker'},
                      'sweatshirt': {'name': 'a sweatshirt or heavier long-sleeve outwear'},
-                     'tights': {'name': 'tights'} ,
+                     'tights': {'name': 'tights'},
                      'heavy_socks': {'name': 'wool or insulated socks', 'false_name': 'regular socks'},
                      }
 # Get the list of keys to the clothing dictionary as a list for convenience
 CLOTHING_KEYS = [*OUTFIT_COMPONENTS.keys()]
+
+
 class BaseOutfit(object):
     """ Base class for different activity options.
         Working off the machine determined models
@@ -68,7 +70,7 @@ class BaseOutfit(object):
         else:
             item_list = [item]
 
-        hum = hum if hum < 1 else hum/100
+        hum = hum if hum < 1 else hum / 100
 
         for i in item_list:
             model_name = get_model_name(item=i, sport=self.ACTIVITY_TYPE)
@@ -86,49 +88,14 @@ class BaseOutfit(object):
 
         return outfit
 
-    _response_prefixes = {
-        "initial":
-            ["It looks like",
-             "Oh my, look like",
-             "Well, ",
-             "Temperature seems",
-             "Weather underground says"],
-        "clothing":
-            ["I suggest wearing",
-             "Based on the weather conditions, you should consider",
-             "Looks like today would be a good day to wear",
-             "If I were going out I'd wear",
-             "You should probably wear",
-             "Consider wearing",],
-        ALWAYS_KEY:
-            ["Of course, you should always",
-             "It would be insane not to wear",
-             "Also, you should always wear",
-             "And I never go out without"]}
+
 
     def __init__(self, temp_offset=0):
         self._temp_offset = temp_offset
         self.logger = logging.getLogger(__name__)
         self.logger.debug("Creating an instance of %s", self.__class__.__name__)
 
-    def _get_condition_for_temp(self, temp_f):
-        """ Given a temperature (Farenheit), return a key (condition) used
-            to gather up configuratons
-        """
-        t = int(temp_f) + self._temp_offset
-        if t < 40:
-            condition = "cold"
-        elif t < 48:
-            condition = "cool"
-        elif t < 58:
-            condition = "mild"
-        elif t < 68:
-            condition = "warm"
-        elif t < 75:
-            condition = "very warm"
-        else:
-            condition = "hot"
-        return condition
+
 
     @staticmethod
     def _build_generic_from_list(outfit_items):
@@ -203,7 +170,6 @@ class Running(BaseOutfit):
     ACTIVITY_TYPE = "run"
     outfit_component_description = {'ears_hat': {'name': 'a hat or ear covers'},
                                     'sweatshirt': {'name': 'a sweatshirt'}, }
-
 
 if __name__ == '__main__':
     r = Running()

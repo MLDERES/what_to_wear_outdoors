@@ -3,7 +3,6 @@ from pandas.api.types import CategoricalDtype
 import logging
 import pickle
 import datetime
-from sklearn.linear_model import LogisticRegression
 from pathlib import Path
 import numpy as np
 from sklearn.multioutput import MultiOutputClassifier
@@ -57,7 +56,7 @@ def train(sport='Run'):
     logger.debug(f'Reading data from {data_file}')
     # TODO: Check for valid values of sport in the request to train
     valid_sports = ['Run']
-    logger.warning(f'The only sports that are supported at this point are {valid_sports}')
+    logger.info(f'The only sports that are supported at this point are {valid_sports}')
     #  Import and clean data
     full_ds = pd.read_excel(data_file, sheet_name='Activity Log2',
                             skip_blank_lines=True,
@@ -84,15 +83,18 @@ def train(sport='Run'):
     full_ds['activity_month'] = full_ds['activity_date'].dt.month.astype('category')
     full_ds['activity_length'] = pd.cut(full_ds.duration, bins=[0, 31, 61, 121, 720],
                                         labels=['short', 'medium', 'long', 'extra long'])
-    ALL_CATEGORICAL_COLUMNS = ['activity',
-                               'weather_condition',
-                               'wind_dir',
-                               'outer_layer',
-                               'base_layer',
-                               'jacket',
-                               'lower_body']
-    for c in ALL_CATEGORICAL_COLUMNS:
-        full_ds[c] = full_ds[c].astype('category')
+    # ALL_CATEGORICAL_COLUMNS = ['activity',
+    #                            'weather_condition',
+    #                            'wind_dir',
+    #                            'outer_layer',
+    #                            'base_layer',
+    #                            'jacket',
+    #                            'lower_body',
+    #                            'ears_hat',
+    #                            'gloves',
+    #                            'heavy_socks']
+    # for c in ALL_CATEGORICAL_COLUMNS:
+    #     full_ds[c] = full_ds[c].astype('category')
 
     leg_categories = ['Shorts', 'Shorts-calf cover', 'Capri', 'Long tights', 'Insulated tights']
     layer_categories = ['None', 'Sleeveless', 'Short-sleeve', 'Long-sleeve', 'Sweatshirt-Heavy']
@@ -105,7 +107,7 @@ def train(sport='Run'):
     CAT_COLS = ['is_light']  # , 'activity_length','wind_dir', 'weather_condition','activity_month'
 
     NON_CAT_COLS = ['duration', 'wind_speed', 'feels_like_temp', 'pct_humidity'] #,'distance' 'temp']
-    ALL_FACTOR_COLS = CAT_COLS + NON_CAT_COLS
+    ALL_FACTOR_COLS = NON_CAT_COLS + CAT_COLS
     PREDICTION_LABELS = ['ears_hat', 'outer_layer', 'base_layer',
                          'jacket', 'gloves', 'lower_body','heavy_socks',
                          #'arm_warmers', 'face_cover', 'shoe_cover' - not used for running
@@ -118,94 +120,71 @@ def train(sport='Run'):
     full_train_ds.drop(['shoe_cover', 'face_cover', 'arm_warmers'], axis='columns', inplace=True)
 
     train_ds = full_train_ds[ALL_FACTOR_COLS]
-    #train_ds = pd.get_dummies(train_ds, columns=CAT_COLS)
-
+    print(f'{train_ds.dtypes}')
     # Finally, we are going to be able to establish the model.
     # TODO: Does it make sense to put the prediction labels in order such that once we predict a label it becomes part
     #   of the model for subsequent models?
     # TODO: This can be done by creating a multivariate logistic regression or by doing a cross-product of all the
     #   combinations and then using these combinations as a single multi-class regression predictor
     X = train_ds
-    #y = full_train_ds[PREDICTION_LABELS].values
-
-    y = np.vstack((full_train_ds['ears_hat'].values,
-                   full_train_ds['gloves'].values)).T
-    #y = np.concatenate()
-    y1 = full_train_ds[['ears_hat', 'gloves', 'heavy_socks']].values
-    y2 = full_train_ds[['outer_layer', 'base_layer', 'jacket', 'lower_body']]
-    print(f'Shape of y: {y.shape}, Shape of y1 = {y1.shape}')
-
+    y_bools = full_train_ds[['ears_hat', 'gloves', 'heavy_socks']]
+    y_class = full_train_ds[['outer_layer', 'base_layer', 'jacket', 'lower_body']]
 
     # https://scikit-learn.org/stable/modules/multiclass.html
+    # We have to do two models, one for booleans and one for classifiers (which seems dumb)
+    # Starting with the classifiers
     forest = DecisionTreeClassifier(max_depth=4)
     mt_forest = MultiOutputClassifier(forest, n_jobs=-1)
-    mt_forest.fit(X, y1)
-    forest.fit(X, y1)
+    mt_forest.fit(X, y_class)
+    pred_X = [[30, 10, 25, .8, True], [40, 10, 60, .8, True]]
+    print(f'Outer Base Jacket Lower {mt_forest.predict(pred_X)}')
+    model_file = get_model(get_model_name('classifiers'))
+    pickle.dump(mt_forest, open(model_file, 'wb'))
 
-    #['is_light', ''duration', 'wind_speed', 'feels_like_temp', 'pct_humidity']
-    pred_X = [[True, 30, 10, 25, .8], [True, 40, 10, 60, .8]]
+    # Now for the booleans
+    forest = DecisionTreeClassifier(max_depth=4)
+    mt_forest = MultiOutputClassifier(forest)
+    mt_forest.fit(X, y_bools)
+    pred_X = [[30, 10, 25, .8, True], [40, 10, 60, .8, True], [80, 0, 75, .3, False]]
+    model_file = get_model(get_model_name('booleans'))
+    pickle.dump(mt_forest, open(model_file, 'wb'))
+
+    #['duration', 'wind_speed', 'feels_like_temp', 'pct_humidity', 'is_light']
+    # pred_X = [[30, 10, 25, .8, True], [40, 10, 60, .8, True]]
     print(f'Ears, Gloves, Heavy Socks {mt_forest.predict(pred_X)}')
-    print(f'Ears, Gloves, Heavy Socks {forest.predict(pred_X)}')
 
-    mt_forest.fit(X, y2)
-    print(f'Outer, Base, Jacket, Lower Body {mt_forest.predict(pred_X)}')
+    # mt_forest.fit(X, y2)
+    # print(f'Outer, Base, Jacket, Lower Body {mt_forest.predict(pred_X)}')
 
-    # for clothing_option in PREDICTION_LABELS:
-    #     logger.info('Building model for {clothing_option}')
-    #     model = LogisticRegression(solver='liblinear')
-    #     y = full_train_ds[clothing_option]
-    #     model.fit(X, y)
-    #     model_score = model.score(X, y)
-    #     logger.debug(f'Score for {clothing_option}: {model_score}')
-    #     c = list(zip(list(X), model.coef_[0]))
-    #     coefficients = pd.DataFrame(c)
-    #     # logging.debug(coefficients)
-    #     logger.debug(f'{clothing_option}\n{coefficients}')
-    #     # Save model to the models folder
-    #     #  names for the athlete and the sport
-    #     model_file = get_model(get_model_name(clothing_option))
-    #     pickle.dump(model, open(model_file, 'wb'))
-    #     logger.info(f'Model written to {model_file}')
-
+class predictor():
     '''
-    Columns as read from data file
-    Index(['Athlete', 'Date', 'Time', 'Activity', 'Distance',
-           'Length of activity (min)', 'Condition', 'Light', 'Wind', 'Wind Dir',
-           'Temp', 'Feels like', 'Humidity', 'Feel', 'Notes', 'Hat', 'Ears',
-           'Long Sleeves', 'Short Sleeve', 'Arm Warmers', 'SweatShirt', 'Jacket',
-           'Gloves', 'Shorts', 'Tights', 'Calf Sleeves', 'Regular Socks',
-           'Heavy Socks', 'Shoe Covers', 'Face Cover'],
-    
-    # Post data cleaning factors
-    activity                   category
-    distance                    float64
-    duration                      int64
-    weather_condition          category
-    is_light                       bool
-    wind_speed                    int64
-    wind_dir                   category
-    temp                          int64
-    feels_like_temp               int64
-    pct_humidity                float64
-    long_sleeves                   bool
-    short_sleeves                  bool
-    arm_warmers                    bool
-    sweatshirt                     bool
-    jacket                         bool
-    gloves                         bool
-    shorts                         bool
-    tights                         bool
-    calf_sleeves                   bool
-    shoe_cover                     bool
-    face_cover                     bool
-    ears_hat                       bool
-    heavy_socks                    bool
-    activity_date        datetime64[ns]
-    activity_hour                 int64
-    activity_month             category
-    activity_length            category
+    The idea here is to be able to pickle a predictor with both ML models (for classification and boolean)
+    Each predictor will hold the model, the input parameters to the model and the prediction labels for each
+    model type
+
+    I expect that I should be able to:
+        1. determine if a model is out of date - is_model_latest
+        2. inflate a model from a file - inflate_model
+        3. run both models against a set of input and return a dictionary of outputs
+        4. update a model from source data if it is out of date
+        5. pickle itself and unpickle so that we can use the functions within  
     '''
 
+    @property
+    def boolean_predictor(self):
+        return
+
+    @boolean_predictor.setter
+    def boolean_predictor(self, value):
+        pass
+
+    @property
+    def classifier(self):
+        return
+
+    @classifier.setter
+    def classifier(self, value):
+        pass
 
 if __name__ == '__main__':
     # create logger with 'spam_application'
