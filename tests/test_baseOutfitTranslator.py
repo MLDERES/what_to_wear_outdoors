@@ -1,16 +1,23 @@
 from unittest import TestCase
 
-from what_to_wear_outdoors.outfit_predictors import BaseOutfitTranslator
+from what_to_wear_outdoors.outfit_predictors import BaseOutfitTranslator, RunningOutfitTranslator, OutfitComponent
 
 
 class TestOutfitTranslator(BaseOutfitTranslator):
-    _local_outfit_descr = dict(short_sleeves={'name': 'singlet'},
-                               gloves=None,
-                               camel_back={'name': 'running camelback'},
-                               wind_jacket={'name': 'wind jacket', 'false_name':'rain jacket'}
-                               )
+    def __init__(self):
+        super(TestOutfitTranslator, self).__init__()
+        self._local_outfit_descr = {'Short - sleeve':OutfitComponent('singlet'),
+                                    'gloves':None,
+                                    'camel_back':OutfitComponent('running camelback'),
+                                    'wind_jacket':OutfitComponent('wind jacket', 'rain jacket'),
+                                    }
 
 class TestBaseOutfitTranslator(TestCase):
+
+    def test_clothing_description(self):
+        bot = BaseOutfitTranslator()
+        print(f'{bot.clothing_items}')
+        pass
 
     def test__build_generic_from_list(self):
         bot = BaseOutfitTranslator()
@@ -29,18 +36,18 @@ class TestBaseOutfitTranslator(TestCase):
     def test__get_component_description(self):
         bot = BaseOutfitTranslator()
         # Test first the base case - ensuring that we are getting the value of the class
-        r = bot._get_component_description('long_sleeves')
-        self.assertEqual('a long-sleeved shirt', r)
+        r = bot._get_component_description('Long - sleeve')
+        self.assertEqual('a long-sleeved top', r)
         # Test the false_name option
-        r = bot._get_component_description('heavy_socks', false_name=True)
+        r = bot._get_component_description('heavy_socks', use_alt_name=True)
         self.assertEqual('regular socks', r)
 
         # Initial test of the subclass to ensure that it gets the parent description
         tot = TestOutfitTranslator()
-        r = tot._get_component_description('long_sleeves')
-        self.assertEqual('a long-sleeved shirt', r)
+        r = tot._get_component_description('Long - sleeve')
+        self.assertEqual('a long-sleeved top', r)
 
-        r = tot._get_component_description('short_sleeves')
+        r = tot._get_component_description('Short - sleeve')
         self.assertEqual('singlet', r)
 
         # This tests to see if we can add an item in the subclass
@@ -54,11 +61,10 @@ class TestBaseOutfitTranslator(TestCase):
         self.assertIsNone(r)
 
         # Test the override for a false name
-        r = tot._get_component_description('wind_jacket', false_name=True)
+        r = tot._get_component_description('wind_jacket', use_alt_name=True)
         self.assertEqual('rain jacket', r)
 
-        # Just ensure we get back a list of component names
-        r = bot.clothing_item_keys()
-
-
+        run_ot = RunningOutfitTranslator()
+        r = run_ot._get_component_description('Short - sleeve')
+        self.assertEqual('singlet', r)
 

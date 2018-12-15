@@ -49,3 +49,6 @@ def get_categorical_model(athlete='default', sport='run') -> Path:
     :return: a path to the categorical model name
     """
     return get_model(get_model_name('cat',athlete,sport))
+
+
+

@@ -1,36 +1,152 @@
+import datetime
+import logging
+import os
+import pickle
+import warnings
 from collections import ChainMap
 from random import random
-from typing import Dict, Any
+
+import pandas as pd
+from pandas.core.dtypes.dtypes import CategoricalDtype
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.tree import DecisionTreeClassifier
 
 if __package__ == '' or __name__ == '__main__':
-    from utility import get_model_name, get_data_path, get_model
+    from utility import get_model_name, get_data_path, get_boolean_model, get_categorical_model
 else:
-    from .utility import get_model_name, get_data_path, get_model
+    from .utility import get_model_name, get_data_path, get_boolean_model, get_categorical_model
 
-class BaseOutfitTranslator:
+logger = logging.getLogger(__name__)
+
+
+class OutfitComponent:
+    def __init__(self, description, alt_description=None):
+        """
+
+        :param name: key which will be used to determine the type
+        :param alternative_name: if not this item then what else.  (i.e. if not heavy socks then regular socks)
+        """
+        self._description = description
+        self._alt_description = alt_description
+
+    @property
+    def description(self):
+        return self._description
+
+    @property
+    def alt_description(self):
+        return self._alt_description
+
+
+class OutfitComponentCollection:
+
+    def __init__(self):
+        """
+
+        """
+        self._components = dict()
+
+
+class BaseActivityMixin:
+    """ This class abstracts the categories of outfit pieces that are described by the translator and features
+    """
+
+    # _local_outfit_descr should be overriden in sub-classes if there is a desire to modify the descriptions
+    # of the outfit_components_descr.  ChainMap first looks in _local_outfit_descr for a key value then looks to the
+    # base class definition.  If a subclass wishes to remove or not consider a component, then set the key value to
+    # None and it will be ignored.
+    def __init__(self):
+        self._local_outfit_descr = dict()
+        self.outfit_components_descr = {'Sleeveless': OutfitComponent('a sleeveless top'),
+                                        'Short-sleeve': OutfitComponent('a short-sleeved shirt'),
+                                        'Long-sleeve': OutfitComponent('a long-sleeved top'),
+                                        'Sweatshirt-Heavy': OutfitComponent(
+                                            'a sweatshirt or heavier long-sleeve outwear'),
+                                        'Rain': OutfitComponent('a rain jacket'),
+                                        'Warmth': OutfitComponent('a warm jacket'),
+                                        'Wind': OutfitComponent('a windbreaker'),
+                                        'Rain-Wind': OutfitComponent('a water repellent windbreaker'),
+                                        'Warmth-Rain': OutfitComponent('a warm water repellent jacket'),
+                                        'Warmth-Wind': OutfitComponent('an insulated windbreaker'),
+                                        'Warmth-Rain-Wind': OutfitComponent(
+                                            'an water repellent, insulated windbreaker'),
+                                        'Shorts': OutfitComponent('shorts'),
+                                        'Shorts-calf cover': OutfitComponent('shorts with long socks or calf sleeves'),
+                                        'Capri': OutfitComponent('capri tights'),
+                                        'Long tights': OutfitComponent('full length tights'),
+                                        'Insulated tights': OutfitComponent('Insulated tights'),
+                                        'ears_hat': OutfitComponent('ear covers'),
+                                        'gloves': OutfitComponent('full fingered gloves'),
+                                        'heavy_socks': OutfitComponent('wool or insulated socks', 'regular socks'),
+                                        'arm_warmers': OutfitComponent('arm warmers'),
+                                        'face_cover': OutfitComponent('face cover'),
+                                        'Toe Cover': OutfitComponent('toe covers'),
+                                        }
+        self._layer_categories = ['None', 'Sleeveless', 'Short-sleeve', 'Long-sleeve', 'Sweatshirt-Heavy']
+        self._jacket_categories = ['None', 'Rain', 'Warmth', 'Wind', 'Rain-Wind',
+                                   'Warmth-Rain', 'Warmth-Wind', 'Warmth-Rain-Wind']
+        self._leg_categories = ['Shorts', 'Shorts-calf cover', 'Capri', 'Long tights', 'Insulated tights']
+        self._shoe_cover_categories = ['None', 'Toe Cover', 'Boots']
+
+        self._categorical_targets = {'outer_layer': self._layer_categories,
+                                     'base_layer': self._layer_categories,
+                                     'jacket': self._jacket_categories,
+                                     'lower_body': self._leg_categories,
+                                     'shoe_cover': self._shoe_cover_categories,
+                                     }
+        self._boolean_targets = ['ears_hat', 'gloves', 'heavy_socks', 'arm_warmers', 'face_cover', ]
+        self._outfit_classes = [*self._categorical_targets.keys()] + self._boolean_targets
+
+        logger.debug("Creating an instance of %s", self.__class__.__name__)
+
+    @property
+    def clothing_descriptions(self) -> ChainMap:
+        """ A collection of the clothing descriptions for this translator.
+
+        :return: ChainMap of items keyed by item
+        """
+        return ChainMap(self._local_outfit_descr, self.outfit_components_descr)
+
+    @property
+    def clothing_items(self) -> [str]:
+        """ The clothing items we are expecting to see for this class
+
+        :return:The clothing items we are expecting to see for this class
+        """
+        return [*self.clothing_descriptions.keys()]
+
+    @property
+    def activity_name(self) -> str:
+        return 'default'
+
+
+class BaseOutfitTranslator(BaseActivityMixin):
     """ This class provides for dealing with the outfit components to full sentence replies
 
     """
-    # _local_outfit_descr should be overriden in sub-classes if there is a desire to modify the descriptions
-    # of the outfit_components_descr.  ChainMap first looks in _local_outfit_descr for a key value then looks to the 
-    # base class definition.  If a subclass wishes to remove or not consider a component, then set the key value to 
-    # None and it will be ignored.
-    _local_outfit_descr = dict()
-    outfit_components_descr = dict(long_sleeves={'name': 'a long-sleeved shirt'},
-                                      short_sleeves={'name': 'a short-sleeved shirt'},
-                                      shorts={'name': 'shorts'},
-                                      calf_sleeves={'name': 'calf sleeves'},
-                                      ears_hat={'name': 'ear covers'},
-                                      gloves={'name': 'full fingered gloves'},
-                                      jacket={'name': 'a windbreaker'},
-                                      sweatshirt={'name': 'a sweatshirt or heavier long-sleeve outwear'},
-                                      tights={'name': 'tights'},
-                                      heavy_socks={'name': 'wool or insulated socks', 'false_name': 'regular socks'})
-    _temp_offset = 0
-
+    _response_prefixes = {
+        "initial":
+            ["It looks like ",
+             "Oh my ",
+             "Well ",
+             "Temperature seems ",
+             "Weather underground says "],
+        "clothing":
+            ["I suggest wearing ",
+             "Based on the weather conditions, you should consider ",
+             "Looks like today would be a good day to wear ",
+             "If I were going out I'd wear "],
+        "always":
+            ["Of course, you should always ",
+             "It would be insane not to wear ",
+             "Also, you should always wear ",
+             "And I never go out without "]}
 
     def __init__(self):
-        pass
+        super(BaseOutfitTranslator, self).__init__()
+        self.logger = logging.getLogger(__name__)
+        self.logger.debug("Creating an instance of %s", self.__class__.__name__)
+        self._temp_offset = 0
 
     def _get_condition_for_temp(self, temp_f):
         """ Given a temperature (Farenheit), return a key (condition) used
@@ -63,30 +179,12 @@ class BaseOutfitTranslator:
         return random.choice(self._response_prefixes["clothing"])
 
     @property
-    def clothing_descriptions(self) -> ChainMap:
-        """ A collection of the clothing items supported by this translator.  Should be a dictionary in the form of
-        [item_name]['name'] and [item_name]['false_name'] optional
-        for instance {'heavy_socks': {'name':'long or heavy socks', false_name:'regular socks'} ...}
-
-        :return: ChainMap of items keyed by item
-        """
-        return ChainMap(self._local_outfit_descr, self.outfit_components_descr)
-
-    def clothing_item_keys(self) -> [str]:
-        ''' The clothing items we are expecting to see for this class
-
-        :return:
-        '''
-        return [*self.clothing_descriptions.keys()]
-
-
-    @property
     def always_prefix(self):
         # For example
         #  A:  Of course, ALWAYS wear .... (helmet / sunscreen)
         return random.choice(self._response_prefixes["always"])
 
-    def _get_component_description(self, item_key, false_name=False) -> str:
+    def _get_component_description(self, item_key, use_alt_name=False) -> str:
         """ Determine the proper description of the items that are to be worn (or not)
 
         This method allows for subclasses to override the default descriptions or to provide alternative
@@ -95,17 +193,15 @@ class BaseOutfitTranslator:
         It would be irregular to suggest wearing two kinds of socks, so two alternatives makes sense
 
         :param item_key: the item for which the description should be fetched
-        :param false_name:  if the algorithm says don't get this value, then if there is an alternative return that
+        :param use_alt_name:  if the algorithm says don't get this value, then if there is an alternative return that
         :return: string with the description of the item component, None if not applicable
         """
         item_description = None
+        item = None
         if (self.clothing_descriptions is not None) and item_key in self.clothing_descriptions:
             item = self.clothing_descriptions[item_key]
         if item is not None:
-            if false_name:
-                item_description = item['false_name'] if 'false_name' in item else None
-            else:
-                item_description = item['name'] if 'name' in item else None
+            item_description = item.alt_description if use_alt_name else item.description
         return item_description
 
     def build_reply(self, outfit_items, feels_like_temp):
@@ -120,16 +216,16 @@ class BaseOutfitTranslator:
         """
         if outfit_items is None:
             return ""
-        
-        outfit_items_descriptions = [self._get_component_description(name, use_false) 
+
+        outfit_items_descriptions = [self._get_component_description(name, use_false)
                                      for name, use_false in outfit_items]
-        
+
         reply_temperature = f'{self.initial_prefix} {self._get_condition_for_temp(feels_like_temp)}: ' \
             f'{self.feels_like_temp} degrees'
-        reply = f'{reply_temperature}.\n{self._build_reply_main(outfit_items_descriptions)}. {self._build_always_reply()}'
+        reply = f'{reply_temperature}.\n' \
+            f'{self._build_reply_main(outfit_items_descriptions)}. {self._build_always_reply()}'
         return reply
 
-    
     def _build_always_reply(self):
         reply_always = ""
         return reply_always
@@ -159,13 +255,32 @@ class BaseOutfitTranslator:
             reply = reply.replace("and and", "and")
         return reply
 
-class BaseOutfitPredictor():
-    outfit_components = ['head', 'base_layer', 'outer_layer', 'lower_body', 'socks', 'gloves']
-    _supported_predictors = ['feels_like', 'wind_speed', 'humidity', 'is_light']
+
+class BaseOutfitPredictor(BaseActivityMixin):
+    """ This class provides the common methods required to predict the clothing need to go outside for a given
+        activity.
+    """
 
     def __init__(self):
-        _outfit = {}
-        _temp_f = 0
+        super(BaseOutfitPredictor, self).__init__()
+        # TODO: When we get good enough add in a few more categorical variables
+        self._supported_features = {'scalar': ['feels_like', 'wind_speed', 'pct_humidity', 'duration'],
+                                    'categorical': ['is_light']}
+        self._outfit = {}
+        self._temp_f = 0
+        logger.debug("Creating an instance of %s", self.__class__.__name__)
+
+    @property
+    def features(self):
+        """ All the predictor names (factors that contribute to predicting the clothing options) regardless of type
+
+        :return: list of predictor names
+        """
+        names = []
+        for v in self._supported_features.values():
+            for n in v:
+                names.append(n)
+        return names
 
     # TODO: Handle Imperial and Metric measures (Celcius and kph windspeed)
     def predict_outfit(self, duration, verbose=False, **kwargs: object, ):
@@ -174,7 +289,7 @@ class BaseOutfitPredictor():
         :param verbose:  if True then return a string response suitable for human consumption, if False, return
         a dictionary of the components in the outfit
         :type kwargs: additional forecasting features supported by the particular activity class see
-        _supported_predictors contains this list of useful arguments
+        _supported_features contains this list of useful arguments
         :param duration: length of activity in minutes
         :return: dictionary of outfit components, keys are defined by output components, if none specified the consider
         all of the items
@@ -184,35 +299,178 @@ class BaseOutfitPredictor():
         ' If yes, then we can just open the models and do the predicting' \
         ' if not then we are going to have to do the heavy lifting to create new models'
         '''
-        utility.get_data('what i wore running.xlsx')
-        pass
+        raw_data_path = get_data_path('what i wore running.xlsx')
+        boolean_model_path = get_boolean_model(self._activity_name)
+        cat_model_path = get_categorical_model(self._activity_name)
+        if os.stat(raw_data_path).st_ctime > os.stat(boolean_model_path) \
+            or (os.stat(raw_data_path).st_ctime > os.stat(cat_model_path)):
+            # Need to rebuild the models
+            (cat_model, bool_model) = self.rebuild_models()
+        else:
+            # We are good to go with the current models and just need to do the predicting
+            (cat_model, bool_model) = self.load_models()
 
-    def predict_outfit(self, duration, fct, verbose=False):
-        """ Predict the clothing options that would be appropriate for an outdoor activity.
+        # Now we need to predict using the categorical model and then the boolean model
+        #  The categorical model will predict items that can be of more than one type
+        #  (i.e. base layer can be sleeveless, short-sleeved or long-sleeve)
+        #  boolean is used for categories of 2 or True/False
+        #   (i.e. heavy socks, if true then use heavy socks, otherwise we can assume regular socks)
+        #   (i.e. arm warmers, if needed True if not then False
 
-        :param verbose: if True then return a string response suitable for human consumption, if False, return
-        a dictionary of the components in the outfit
-        :param duration: length of activity in minutes
-        :param fct:
-        :return: dictionary of outfit components, keys are defined by output components
-        """
+        # TODO: Create an array of features
+        # pms = np.array([duration, wind_speed, feel, hum, not light, light]).reshape(1, -1)
+        # pds = None
+        # cat_results = cat_model.predict(pds)
+        # bool_results = bool_model.predict(pds)
         pass
 
     @property
     def outfit_(self):
         return self.__outfit
 
+    def rebuild_models(self) -> (MultiOutputClassifier, MultiOutputClassifier):
+        """  Read the raw data and build the models (one for categorical targets one for boolean targets)
+            This function also pickles and saves the models and returns them to the caller in a tuple
 
-class RunningOutfitTranslator(BaseOutfitTranslator):
-    _local_outfit_components: Dict[str, Dict[str, str]] = dict(ears_hat={'name': 'a hat or ear covers'},
-                                                               sweatshirt={'name': 'a sweatshirt'})
+        :return: (cat_model, bool_model)
+        """
+        full_ds = self.prepare_data()
+
+        # Gathering up the keys for the clothing aspects we are interested in for this activity
+        prediction_labels = self.clothing_items
+
+        full_train_ds = full_ds[(full_ds.activity == self.activity_name)].copy()
+        # TODO: --SPORT FILTER -- Remove this when we have taken care to handle multiple athletes
+        full_train_ds.drop(['Athlete', 'activity', 'activity_date'], axis='columns', inplace=True)
+
+        # 'weather_condition', 'is_light', 'wind_speed', 'wind_dir', 'temp',
+        # 'feels_like_temp', 'pct_humidity', 'ears_hat', 'outer_layer',
+        # 'base_layer', 'arm_warmers', 'jacket', 'gloves', 'lower_body',
+        # 'heavy_socks', 'shoe_cover', 'face_cover', 'activity_month',
+        # 'activity_length']
+        def drop_others(df, keep):
+            drop_cols = [k for k in df.columns if k not in keep]
+            df.drop(drop_cols, axis=1, inplace=True)
+
+        # Take out any columns which we haven't specified as features or labels
+        drop_others(full_train_ds, self._outfit_classes + self.features)
+
+        # Finally, we are going to be able to establish the model.
+        train_X = full_train_ds[self.features]
+
+        cat_targets = list(self._categorical_targets.keys())
+        y_class = full_train_ds[cat_targets]
+        y_bools = full_train_ds[self._boolean_targets]
+
+        # https://scikit-learn.org/stable/modules/multiclass.html
+        # We have to do two models, one for booleans and one for classifiers (which seems dumb)
+        # Starting with the booleans
+        bool_forest = DecisionTreeClassifier(max_depth=4)
+        bool_forest_mo = MultiOutputClassifier(bool_forest)
+        bool_forest_mo.fit(train_X, y_bools)
+        model_file = get_boolean_model(sport=self.activity_name)
+        pickle.dump(bool_forest_mo, open(model_file, 'wb'))
+
+        # Now for the classifiers
+        forest = DecisionTreeClassifier(max_depth=4)
+        mt_forest = MultiOutputClassifier(forest, n_jobs=-1)
+        mt_forest.fit(train_X, y_class)
+        model_file = get_categorical_model(sport=self.activity_name)
+        pickle.dump(mt_forest, open(model_file, 'wb'))
+        return mt_forest, bool_forest_mo
+
+    def prepare_data(self, filename='what i wore running.xlsx'):
+        """
+        Rebuild both of the models associated with this activity, the categorical and the boolean model
+        :return: a DataFrame encapsulating the raw data, cleaned up from the excel file
+        """
+        data_file = get_data_path(filename)
+        logger.debug(f'Reading data from {data_file}')
+        #  Import and clean data
+        full_ds = pd.read_excel(data_file, sheet_name='Activity Log2',
+                                skip_blank_lines=True,
+                                true_values=['Yes', 'yes', 'y'], false_values=['No', 'no', 'n'],
+                                dtype={'Time': datetime.time}, usecols='A:Y')
+        full_ds.dropna(how='all', inplace=True)
+        full_ds.fillna(value=False, inplace=True)
+        logger.debug(f'Data file shape: {data_file}')
+        full_ds.rename(
+            {'Date': 'activity_date', 'Time': 'activity_hour', 'Activity': 'activity', 'Distance': 'distance',
+             'Length of activity (min)': 'duration', 'Condition': 'weather_condition', 'Light': 'is_light',
+             'Wind': 'wind_speed', 'Wind Dir': 'wind_dir', 'Temp': 'temp', 'Feels like': 'feels_like',
+             'Humidity': 'pct_humidity',
+             'Hat-Ears': 'ears_hat', 'Outer Layer': 'outer_layer', 'Base Layer': 'base_layer',
+             'Arm Warmers': 'arm_warmers', 'Jacket': 'jacket', 'Gloves': 'gloves',
+             'LowerBody': 'lower_body', 'Shoe Covers': 'shoe_cover', 'Face Cover': 'face_cover',
+             'Heavy Socks': 'heavy_socks', },
+            axis='columns', inplace=True, )
+        # Now deal with the special cases
+        full_ds.drop(['Feel', 'Notes', 'Hat', 'Ears', 'activity_hour'], axis='columns', inplace=True, errors='ignore')
+        # Establish the categorical variables
+        full_ds['activity_month'] = full_ds['activity_date'].dt.month.astype('category')
+        full_ds['activity_length'] = pd.cut(full_ds.duration, bins=[0, 31, 61, 121, 720],
+                                            labels=['short', 'medium', 'long', 'extra long'])
+        full_ds['lower_body'] = \
+            full_ds['lower_body'].astype(CategoricalDtype(categories=self._leg_categories, ordered=True))
+        full_ds['outer_layer'] = \
+            full_ds['outer_layer'].astype(CategoricalDtype(categories=self._layer_categories, ordered=True))
+        full_ds['base_layer'] = \
+            full_ds['base_layer'].astype(CategoricalDtype(categories=self._layer_categories, ordered=True))
+
+        return full_ds
+
+    def load_models(self):
+        """
+        Go to the default models directory and load up both the boolean and categorical models
+        :return: tuple containing the categorical model and the boolean model
+        """
+        boolean_model_path = get_boolean_model(self._activity_name)
+        cat_model_path = get_categorical_model(self._activity_name)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            cat_model = pickle.load(cat_model_path)
+            bool_model = pickle.load(boolean_model_path)
+        return cat_model, bool_model
 
 
-class BikingOutfitTranslator(BaseOutfitTranslator):
-    _local_outfit_components: Dict[str, Dict[str, str]] = dict(ears_hat={'name': 'ear covers'},
-                                                               toe_cover={'name': 'toe covers'})
+class RunningOutfitMixin(BaseActivityMixin):
+    """ Provides an override for the components that are unique to running
 
-if __name__ == '__main__':
-    bot = BaseOutfitTranslator()
-    r = bot._build_generic_from_list(['short sleeves', 'socks', 'shoes'])
-    print (r)
+    """
+
+    def __init__(self):
+        super(RunningOutfitMixin, self).__init__()
+        self._local_outfit_descr = {'Short - sleeve': OutfitComponent('singlet'),
+                                    'Toe cover': None,
+                                    'Boot': None,
+                                    'face_cover': None,
+                                    }
+
+    @property
+    def activity_name(self):
+        return 'Run'
+
+
+class RunningOutfitTranslator(BaseOutfitTranslator, RunningOutfitMixin):
+    def __init__(self, ):
+        """"""
+        super(RunningOutfitTranslator, self).__init__()
+
+
+class RunningOutfitPredictor(BaseOutfitPredictor, RunningOutfitMixin):
+    def __init__(self, ):
+        """"""
+        super(RunningOutfitPredictor, self).__init__()
+
+
+class RoadbikeOutfitMixin(BaseActivityMixin):
+    def __init__(self):
+        super(RoadbikeOutfitMixin, self).__init__()
+        self._local_outfit_components = {'ears_hat': OutfitComponent('ear covers'),
+                                         'Boot': OutfitComponent('insulated cycling boot'),
+                                         }
+
+
+class RoadbikeOutfitTranslator(BaseOutfitTranslator, RoadbikeOutfitMixin):
+    def __init__(self):
+        super(RoadbikeOutfitTranslator, self).__init__()
