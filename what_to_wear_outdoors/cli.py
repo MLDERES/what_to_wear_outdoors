@@ -7,6 +7,7 @@ import logging
 import textwrap
 
 from what_to_wear_outdoors.clothing_options import Running2
+from what_to_wear_outdoors.outfit_predictors import RunningOutfitPredictor
 
 if __name__ == '__main__' or __package__ == '':
     from weather_observation import Weather, Forecast
@@ -158,12 +159,14 @@ def main():
         default='Fayetteville, AR')
 
     w = Weather()
-    logging.debug(f'Forecast (calculated): {forecast_dt}')
+    logging.debug(f'Forecast date (calculated): {forecast_dt}')
     fct = w.get_forecast(forecast_dt, activity_location)
     print(fct)
-    running = Running()
-    print('\n')
-    click.secho(f'#{"-" * 18}ML OUTPUT{"-" * 18}#',fg=Colors['Output'])
+    rop = RunningOutfitPredictor()
+    rop.predict_outfit(        rop.predict_outfit(**{'feels_like': 52, 'wind_speed': 0, 'pct_humidity': .82, 'duration': 50,
+                              'is_light': False}),
+        print(f'{rot.build_reply(rop.outfit_, 52)}'))
+    click.secho(f'\n#{"-" * 18}ML OUTPUT{"-" * 18}#',fg=Colors['Output'])
     [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(running.build_reply(fct))]
     running2 = Running2()
     click.secho(f'\n\n#{"-" * 18}STANDARD OUTPUT{"-" * 18}#', fg=Colors['Alternate_Output'])

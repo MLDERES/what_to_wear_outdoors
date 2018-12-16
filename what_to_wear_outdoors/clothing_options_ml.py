@@ -10,8 +10,6 @@ if __package__ == '' or __name__ == '__main__':
 else:
     from .utility import get_model_name, get_model
 
-# from weather_observation import Forecast
-
 # TODO: Build response string from ML results
 OUTFIT_COMPONENTS = {'long_sleeves': {'name': 'a long-sleeved shirt'},
                      'short_sleeves': {'name': 'a short-sleeved shirt'},
@@ -113,9 +111,6 @@ class BaseOutfit(object):
 
     def _build_always_reply(self):
         reply_always = ""
-        # if self._always is not None:
-        #     reply_always += self.always_prefix
-        #     reply_always += self._build_generic_from_dict(self._always)
         return reply_always
 
     def _build_reply_main(self, outfit_items):

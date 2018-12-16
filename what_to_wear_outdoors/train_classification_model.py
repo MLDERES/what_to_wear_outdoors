@@ -83,18 +83,6 @@ def train(sport='Run'):
     full_ds['activity_month'] = full_ds['activity_date'].dt.month.astype('category')
     full_ds['activity_length'] = pd.cut(full_ds.duration, bins=[0, 31, 61, 121, 720],
                                         labels=['short', 'medium', 'long', 'extra long'])
-    # ALL_CATEGORICAL_COLUMNS = ['activity',
-    #                            'weather_condition',
-    #                            'wind_dir',
-    #                            'outer_layer',
-    #                            'base_layer',
-    #                            'jacket',
-    #                            'lower_body',
-    #                            'ears_hat',
-    #                            'gloves',
-    #                            'heavy_socks']
-    # for c in ALL_CATEGORICAL_COLUMNS:
-    #     full_ds[c] = full_ds[c].astype('category')
 
     leg_categories = ['Shorts', 'Shorts-calf cover', 'Capri', 'Long tights', 'Insulated tights']
     layer_categories = ['None', 'Sleeveless', 'Short-sleeve', 'Long-sleeve', 'Sweatshirt-Heavy']

@@ -4,17 +4,20 @@ import os
 import pickle
 import warnings
 from collections import ChainMap
-from random import random
+from pathlib import Path
+import random
 
 import pandas as pd
+import numpy as np
+from numpy.core.multiarray import ndarray
 from pandas.core.dtypes.dtypes import CategoricalDtype
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.tree import DecisionTreeClassifier
 
 if __package__ == '' or __name__ == '__main__':
-    from utility import get_model_name, get_data_path, get_boolean_model, get_categorical_model
+    from utility import get_data_path, get_boolean_model, get_categorical_model
 else:
-    from .utility import get_model_name, get_data_path, get_boolean_model, get_categorical_model
+    from .utility import get_data_path, get_boolean_model, get_categorical_model
 
 logger = logging.getLogger(__name__)
 
@@ -38,18 +41,10 @@ class OutfitComponent:
         return self._alt_description
 
 
-class OutfitComponentCollection:
-
-    def __init__(self):
-        """
-
-        """
-        self._components = dict()
-
-
 class BaseActivityMixin:
     """ This class abstracts the categories of outfit pieces that are described by the translator and features
     """
+    _prediction_labels: ndarray
 
     # _local_outfit_descr should be overriden in sub-classes if there is a desire to modify the descriptions
     # of the outfit_components_descr.  ChainMap first looks in _local_outfit_descr for a key value then looks to the
@@ -94,8 +89,11 @@ class BaseActivityMixin:
                                      'lower_body': self._leg_categories,
                                      'shoe_cover': self._shoe_cover_categories,
                                      }
-        self._boolean_targets = ['ears_hat', 'gloves', 'heavy_socks', 'arm_warmers', 'face_cover', ]
+        self._boolean_targets = \
+            self._boolean_labels = ['ears_hat', 'gloves', 'heavy_socks', 'arm_warmers', 'face_cover', ]
         self._outfit_classes = [*self._categorical_targets.keys()] + self._boolean_targets
+        self._categorical_labels = [*self._categorical_targets.keys()]
+        self._prediction_labels = np.concatenate((self._categorical_labels, self._boolean_labels), axis=None)
 
         logger.debug("Creating an instance of %s", self.__class__.__name__)
 
@@ -119,6 +117,9 @@ class BaseActivityMixin:
     def activity_name(self) -> str:
         return 'default'
 
+    @property
+    def prediction_labels(self):
+        return self._prediction_labels
 
 class BaseOutfitTranslator(BaseActivityMixin):
     """ This class provides for dealing with the outfit components to full sentence replies
@@ -126,21 +127,21 @@ class BaseOutfitTranslator(BaseActivityMixin):
     """
     _response_prefixes = {
         "initial":
-            ["It looks like ",
-             "Oh my ",
-             "Well ",
-             "Temperature seems ",
-             "Weather underground says "],
+            ["It looks like",
+             "Oh my,",
+             "Well,",
+             "Temperature seems",
+             "Weather underground says"],
         "clothing":
-            ["I suggest wearing ",
-             "Based on the weather conditions, you should consider ",
-             "Looks like today would be a good day to wear ",
-             "If I were going out I'd wear "],
+            ["I suggest wearing",
+             "Based on the weather conditions, you should consider",
+             "Looks like today would be a good day to wear",
+             "If I were going out I'd wear"],
         "always":
-            ["Of course, you should always ",
-             "It would be insane not to wear ",
-             "Also, you should always wear ",
-             "And I never go out without "]}
+            ["Of course, you should always",
+             "It would be insane not to wear",
+             "Also, you should always wear",
+             "And I never go out without"]}
 
     def __init__(self):
         super(BaseOutfitTranslator, self).__init__()
@@ -217,11 +218,20 @@ class BaseOutfitTranslator(BaseActivityMixin):
         if outfit_items is None:
             return ""
 
-        outfit_items_descriptions = [self._get_component_description(name, use_false)
-                                     for name, use_false in outfit_items]
+        # We can iterate this list, but some of it is descriptions, some are true/false components
+        # so we need to decide what kind it is and deal with it accordingly
+
+        #  Go through the items we want to output for this translator and just get the descriptions for them
+        outfit_items_descriptions = []
+        for i in outfit_items.items():
+            if i[1] is bool:
+                oi = self._get_component_description(i[0],i[1])
+            else:
+                oi = self._get_component_description(i[1])
+            outfit_items_descriptions.append(oi)
 
         reply_temperature = f'{self.initial_prefix} {self._get_condition_for_temp(feels_like_temp)}: ' \
-            f'{self.feels_like_temp} degrees'
+            f'{feels_like_temp} degrees'
         reply = f'{reply_temperature}.\n' \
             f'{self._build_reply_main(outfit_items_descriptions)}. {self._build_always_reply()}'
         return reply
@@ -230,10 +240,10 @@ class BaseOutfitTranslator(BaseActivityMixin):
         reply_always = ""
         return reply_always
 
-    def _build_reply_main(self, outfit_items: [str]) -> object:
-        if outfit_items is None:
+    def _build_reply_main(self, outfit_item_descriptions: [str]) -> object:
+        if outfit_item_descriptions is None:
             raise (ValueError())
-        reply_clothing = f'{self.clothing_prefix} {self._build_generic_from_list(outfit_items)}'
+        reply_clothing = f'{self.clothing_prefix} {self._build_generic_from_list(outfit_item_descriptions)}'
         return reply_clothing
 
     @staticmethod
@@ -282,8 +292,8 @@ class BaseOutfitPredictor(BaseActivityMixin):
                 names.append(n)
         return names
 
-    # TODO: Handle Imperial and Metric measures (Celcius and kph windspeed)
-    def predict_outfit(self, duration, verbose=False, **kwargs: object, ):
+    # TODO: Handle Imperial and Metric measures (Celsius and kph wind speed)
+    def predict_outfit(self, verbose=False, **kwargs: object):
         """ Predict the clothing options that would be appropriate for an outdoor activity.
 
         :param verbose:  if True then return a string response suitable for human consumption, if False, return
@@ -291,24 +301,8 @@ class BaseOutfitPredictor(BaseActivityMixin):
         :type kwargs: additional forecasting features supported by the particular activity class see
         _supported_features contains this list of useful arguments
         :param duration: length of activity in minutes
-        :return: dictionary of outfit components, keys are defined by output components, if none specified the consider
-        all of the items
+        :return: dictionary of outfit components, keys are defined by output components
         """
-
-        ''' Are the two models up to date?' \
-        ' If yes, then we can just open the models and do the predicting' \
-        ' if not then we are going to have to do the heavy lifting to create new models'
-        '''
-        raw_data_path = get_data_path('what i wore running.xlsx')
-        boolean_model_path = get_boolean_model(self._activity_name)
-        cat_model_path = get_categorical_model(self._activity_name)
-        if os.stat(raw_data_path).st_ctime > os.stat(boolean_model_path) \
-            or (os.stat(raw_data_path).st_ctime > os.stat(cat_model_path)):
-            # Need to rebuild the models
-            (cat_model, bool_model) = self.rebuild_models()
-        else:
-            # We are good to go with the current models and just need to do the predicting
-            (cat_model, bool_model) = self.load_models()
 
         # Now we need to predict using the categorical model and then the boolean model
         #  The categorical model will predict items that can be of more than one type
@@ -316,13 +310,60 @@ class BaseOutfitPredictor(BaseActivityMixin):
         #  boolean is used for categories of 2 or True/False
         #   (i.e. heavy socks, if true then use heavy socks, otherwise we can assume regular socks)
         #   (i.e. arm warmers, if needed True if not then False
+        cat_model, bool_model = self.get_models()
 
-        # TODO: Create an array of features
-        # pms = np.array([duration, wind_speed, feel, hum, not light, light]).reshape(1, -1)
-        # pds = None
-        # cat_results = cat_model.predict(pds)
-        # bool_results = bool_model.predict(pds)
-        pass
+        # Load up a dataset with the supplied predictors (from the input parameters)
+        # Filter this list based on what is used to predict the outcomes
+        # Run the predictor
+        # Put the results into a dictionary that can be returned to the caller
+        prediction_factors = pd.DataFrame(kwargs, index=[0])
+        prediction_factors = prediction_factors[self.features]
+        cat_outcomes = cat_model.predict(prediction_factors).reshape(-1)
+        bool_outcomes = bool_model.predict(prediction_factors).reshape(-1)
+
+        predictions = np.concatenate((cat_outcomes, bool_outcomes), axis=None)
+        results = dict(zip(self.prediction_labels, predictions))
+
+        # Save the last outfit we predicted to a property for easy retrieval
+        self.__outfit = results
+
+        return results
+
+    def get_models(self):
+        """ Get the categorical and boolean models
+
+        :return: A tuple containing the categorical and boolean models
+        """
+        ''' Are the two models up to date?' \
+            ' If yes, then we can just open the models and do the predicting' \
+            ' if not then we are going to have to do the heavy lifting to create new models'
+            '''
+        raw_data_path = get_data_path('what i wore running.xlsx')
+        boolean_model_path = get_boolean_model(sport=self.activity_name)
+        cat_model_path = get_categorical_model(sport=self.activity_name)
+
+        if self._are_models_upto_date(cat_model_path, raw_data_path, boolean_model_path):
+            # We are good to go with the current models and just need to do the predicting
+            (cat_model, bool_model) = self.load_models()
+        else:
+            # Need to rebuild the models
+            (cat_model, bool_model) = self.rebuild_models()
+        return cat_model, bool_model
+
+    def _are_models_upto_date(self, cat_model_path, raw_data_path, boolean_model_path):
+        """ Determine if the model files exist and if so, is the raw data file newer
+
+        :param cat_model_path:
+        :param raw_data_path:
+        :param boolean_model_path:
+        :return:
+        """
+        files_exist = Path.exists(cat_model_path) and Path.exists(boolean_model_path)
+        bool_is_newer = cat_is_newer = False
+        if files_exist:
+            bool_is_newer = os.stat(boolean_model_path).st_ctime >= os.stat(raw_data_path).st_ctime
+            cat_is_newer = os.stat(cat_model_path).st_ctime >= os.stat(raw_data_path).st_ctime
+        return files_exist and bool_is_newer and cat_is_newer
 
     @property
     def outfit_(self):
@@ -335,9 +376,6 @@ class BaseOutfitPredictor(BaseActivityMixin):
         :return: (cat_model, bool_model)
         """
         full_ds = self.prepare_data()
-
-        # Gathering up the keys for the clothing aspects we are interested in for this activity
-        prediction_labels = self.clothing_items
 
         full_train_ds = full_ds[(full_ds.activity == self.activity_name)].copy()
         # TODO: --SPORT FILTER -- Remove this when we have taken care to handle multiple athletes
@@ -424,13 +462,17 @@ class BaseOutfitPredictor(BaseActivityMixin):
         Go to the default models directory and load up both the boolean and categorical models
         :return: tuple containing the categorical model and the boolean model
         """
-        boolean_model_path = get_boolean_model(self._activity_name)
-        cat_model_path = get_categorical_model(self._activity_name)
-        with warnings.catch_warnings():
+        boolean_model_path = get_boolean_model(self.activity_name)
+        cat_model_path = get_categorical_model(self.activity_name)
+        with warnings.catch_warnings(), open(cat_model_path, 'rb') as cf, open(boolean_model_path, 'rb') as bf:
             warnings.simplefilter('ignore')
-            cat_model = pickle.load(cat_model_path)
-            bool_model = pickle.load(boolean_model_path)
+            cat_model = pickle.load(cf)
+            bool_model = pickle.load(bf)
         return cat_model, bool_model
+
+    @outfit_.setter
+    def outfit_(self, value):
+        self._outfit_ = value
 
 
 class RunningOutfitMixin(BaseActivityMixin):
@@ -440,12 +482,11 @@ class RunningOutfitMixin(BaseActivityMixin):
 
     def __init__(self):
         super(RunningOutfitMixin, self).__init__()
-        self._local_outfit_descr = {'Short - sleeve': OutfitComponent('singlet'),
+        self._local_outfit_descr = {'Short-sleeve': OutfitComponent('singlet'),
                                     'Toe cover': None,
                                     'Boot': None,
                                     'face_cover': None,
                                     }
-
     @property
     def activity_name(self):
         return 'Run'
@@ -469,6 +510,10 @@ class RoadbikeOutfitMixin(BaseActivityMixin):
         self._local_outfit_components = {'ears_hat': OutfitComponent('ear covers'),
                                          'Boot': OutfitComponent('insulated cycling boot'),
                                          }
+
+    @property
+    def activity_name(self):
+        return 'Run'
 
 
 class RoadbikeOutfitTranslator(BaseOutfitTranslator, RoadbikeOutfitMixin):

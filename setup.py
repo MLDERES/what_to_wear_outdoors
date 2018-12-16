@@ -19,9 +19,6 @@ requirements = ['Click>=6.0',
                 'xlrd',
                 ]
 
-# setup_requirements = [ ]
-#
-# test_requirements = [ ]
 
 setup(
     author="Michael Dereszynski",

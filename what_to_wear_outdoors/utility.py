@@ -21,7 +21,7 @@ def get_model(filename):
     return _ROOT / 'models' / filename
 
 
-def get_model_name(prefix, athlete='default', sport='run'):
+def get_model_name(prefix, sport, athlete='default'):
     """
     Creates the name of the model based on the athlete and sport.  This function is to ensure consistency
     when creating or opening models
@@ -32,23 +32,23 @@ def get_model_name(prefix, athlete='default', sport='run'):
     """
     return '_'.join([athlete, sport, prefix]) + '.mdl'
 
-def get_boolean_model(athlete='default', sport='run') -> Path:
+def get_boolean_model(sport, athlete='default') -> Path:
     """
     Return the model name for the Boolean models
     :param athlete:athlete identifier for the specific model
     :param sport: sport for  the model name
     :return: a path to the boolean model name
     """
-    return get_model(get_model_name('bool', athlete, sport))
+    return get_model(get_model_name('bool', sport, athlete))
 
-def get_categorical_model(athlete='default', sport='run') -> Path:
+def get_categorical_model(sport, athlete='default') -> Path:
     """
     Return the model name for the categorical models
     :param athlete:athlete identifier for the specific model
     :param sport: sport for  the model name
     :return: a path to the categorical model name
     """
-    return get_model(get_model_name('cat',athlete,sport))
+    return get_model(get_model_name('cat', sport, athlete))
 
 
 
