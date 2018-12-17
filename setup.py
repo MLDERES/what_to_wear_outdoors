@@ -54,10 +54,8 @@ setup(
     package_data= {
         'what_to_wear_outdoors': ['data/*','models/*']
     },
-    #setup_requires=setup_requirements,
     test_suite='tests',
-    #tests_require=test_requirements,
     url='https://github.com/mlderes/what_to_wear_outdoors',
-    version='0.1.0',
+    version='1.0.0',
     zip_safe=False,
 )

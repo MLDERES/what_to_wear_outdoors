@@ -2,10 +2,11 @@ import datetime
 import logging
 import os
 import pickle
+import random
 import warnings
 from collections import ChainMap
 from pathlib import Path
-import random
+from typing import List, Dict, ClassVar
 
 import pandas as pd
 import numpy as np
@@ -13,6 +14,7 @@ from numpy.core.multiarray import ndarray
 from pandas.core.dtypes.dtypes import CategoricalDtype
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.tree import DecisionTreeClassifier
+from abc import abstractmethod
 
 if __package__ == '' or __name__ == '__main__':
     from utility import get_data_path, get_boolean_model, get_categorical_model
@@ -40,8 +42,7 @@ class OutfitComponent:
     def alt_description(self):
         return self._alt_description
 
-
-class BaseActivityMixin:
+class BaseActivityMixin():
     """ This class abstracts the categories of outfit pieces that are described by the translator and features
     """
     _prediction_labels: ndarray
@@ -114,6 +115,7 @@ class BaseActivityMixin:
         return [*self.clothing_descriptions.keys()]
 
     @property
+    @abstractmethod
     def activity_name(self) -> str:
         return 'default'
 
@@ -121,167 +123,50 @@ class BaseActivityMixin:
     def prediction_labels(self):
         return self._prediction_labels
 
-class BaseOutfitTranslator(BaseActivityMixin):
-    """ This class provides for dealing with the outfit components to full sentence replies
+class RunningOutfitMixin(BaseActivityMixin):
+    """ Provides an override for the components that are unique to running
 
     """
-    _response_prefixes = {
-        "initial":
-            ["It looks like",
-             "Oh my,",
-             "Well,",
-             "Temperature seems",
-             "Weather underground says"],
-        "clothing":
-            ["I suggest wearing",
-             "Based on the weather conditions, you should consider",
-             "Looks like today would be a good day to wear",
-             "If I were going out I'd wear"],
-        "always":
-            ["Of course, you should always",
-             "It would be insane not to wear",
-             "Also, you should always wear",
-             "And I never go out without"]}
 
     def __init__(self):
-        super(BaseOutfitTranslator, self).__init__()
-        self.logger = logging.getLogger(__name__)
-        self.logger.debug("Creating an instance of %s", self.__class__.__name__)
-        self._temp_offset = 0
-
-    def _get_condition_for_temp(self, temp_f):
-        """ Given a temperature (Farenheit), return a key (condition) used
-            to gather up configuratons
-        """
-        t = int(temp_f) + self._temp_offset
-        if t < 40:
-            condition = "cold"
-        elif t < 48:
-            condition = "cool"
-        elif t < 58:
-            condition = "mild"
-        elif t < 68:
-            condition = "warm"
-        elif t < 75:
-            condition = "very warm"
-        else:
-            condition = "hot"
-        return condition
-
-    # These are defined as properties so that they could be overridden in subclasses if desired
+        super(RunningOutfitMixin, self).__init__()
+        self._local_outfit_descr = {'Short-sleeve': OutfitComponent('singlet'),
+                                    'Toe cover': None,
+                                    'Boot': None,
+                                    'face_cover': None,
+                                    }
     @property
-    def initial_prefix(self):
-        return random.choice(self._response_prefixes["initial"]) + " it is going to be"
+    def activity_name(self):
+        return 'Run'
+
+class RoadbikeOutfitMixin(BaseActivityMixin):
+    def __init__(self):
+        super(RoadbikeOutfitMixin, self).__init__()
+        self._local_outfit_components = {'ears_hat': OutfitComponent('ear covers'),
+                                         'Boot': OutfitComponent('insulated cycling boot'),
+                                         }
 
     @property
-    def clothing_prefix(self):
-        # For example
-        # A:  I suggest you wear .....
-        return random.choice(self._response_prefixes["clothing"])
-
-    @property
-    def always_prefix(self):
-        # For example
-        #  A:  Of course, ALWAYS wear .... (helmet / sunscreen)
-        return random.choice(self._response_prefixes["always"])
-
-    def _get_component_description(self, item_key, use_alt_name=False) -> str:
-        """ Determine the proper description of the items that are to be worn (or not)
-
-        This method allows for subclasses to override the default descriptions or to provide alternative
-        'false_names'.  False names is a simple way to handle the situation where there are only two options -
-        for instance heavy_socks.  If not recommending heavy socks then we recommend regular socks.
-        It would be irregular to suggest wearing two kinds of socks, so two alternatives makes sense
-
-        :param item_key: the item for which the description should be fetched
-        :param use_alt_name:  if the algorithm says don't get this value, then if there is an alternative return that
-        :return: string with the description of the item component, None if not applicable
-        """
-        item_description = None
-        item = None
-        if (self.clothing_descriptions is not None) and item_key in self.clothing_descriptions:
-            item = self.clothing_descriptions[item_key]
-        if item is not None:
-            item_description = item.alt_description if use_alt_name else item.description
-        return item_description
-
-    def build_reply(self, outfit_items, feels_like_temp):
-        """ Once the outfit has been predicted this will return the human readable string response
-        
-        :type outfit_items: dictionary[str,bool]
-        :param outfit_items: the list of items that should be considered, these need to match the names in the
-        outfit_components otherwise we have a problem.
-        :type feels_like_temp float
-        :param feels_like_temp: the outdoor temperature in degrees F
-        :return: string representing the human readable outfit options
-        """
-        if outfit_items is None:
-            return ""
-
-        # We can iterate this list, but some of it is descriptions, some are true/false components
-        # so we need to decide what kind it is and deal with it accordingly
-
-        #  Go through the items we want to output for this translator and just get the descriptions for them
-        outfit_items_descriptions = []
-        for i in outfit_items.items():
-            if i[1] is bool:
-                oi = self._get_component_description(i[0],i[1])
-            else:
-                oi = self._get_component_description(i[1])
-            outfit_items_descriptions.append(oi)
-
-        reply_temperature = f'{self.initial_prefix} {self._get_condition_for_temp(feels_like_temp)}: ' \
-            f'{feels_like_temp} degrees'
-        reply = f'{reply_temperature}.\n' \
-            f'{self._build_reply_main(outfit_items_descriptions)}. {self._build_always_reply()}'
-        return reply
-
-    def _build_always_reply(self):
-        reply_always = ""
-        return reply_always
-
-    def _build_reply_main(self, outfit_item_descriptions: [str]) -> object:
-        if outfit_item_descriptions is None:
-            raise (ValueError())
-        reply_clothing = f'{self.clothing_prefix} {self._build_generic_from_list(outfit_item_descriptions)}'
-        return reply_clothing
-
-    @staticmethod
-    def _build_generic_from_list(outfit_items) -> str:
-        ''' Build a reply from the list of outfit descriptions
-        
-        :param outfit_items: list of item descriptions to be put into a full sentence reply
-        :return: full sentence reply given the list of items passed to the function
-        '''
-        reply = ""
-        for item in outfit_items:
-            if item is not None:
-                reply += f'{item}, '
-        reply = reply.strip(', ')
-        pos = reply.rfind(',')
-        # Here we are just taking out the last , to replace it with 'and'
-        if pos > 0:
-            reply = reply[:pos] + " and" + reply[pos + 1:]
-            reply = reply.replace("and and", "and")
-        return reply
-
+    def activity_name(self):
+        return 'Roadbike'
 
 class BaseOutfitPredictor(BaseActivityMixin):
     """ This class provides the common methods required to predict the clothing need to go outside for a given
         activity.
     """
+    __outfit: Dict[str, str]
 
     def __init__(self):
         super(BaseOutfitPredictor, self).__init__()
         # TODO: When we get good enough add in a few more categorical variables
         self._supported_features = {'scalar': ['feels_like', 'wind_speed', 'pct_humidity', 'duration'],
                                     'categorical': ['is_light']}
-        self._outfit = {}
+        self.__outfit = {}
         self._temp_f = 0
         logger.debug("Creating an instance of %s", self.__class__.__name__)
 
     @property
-    def features(self):
+    def features(self) -> List[str]:
         """ All the predictor names (factors that contribute to predicting the clothing options) regardless of type
 
         :return: list of predictor names
@@ -293,11 +178,8 @@ class BaseOutfitPredictor(BaseActivityMixin):
         return names
 
     # TODO: Handle Imperial and Metric measures (Celsius and kph wind speed)
-    def predict_outfit(self, verbose=False, **kwargs: object):
+    def predict_outfit(self, **kwargs: object) -> Dict[str, str]:
         """ Predict the clothing options that would be appropriate for an outdoor activity.
-
-        :param verbose:  if True then return a string response suitable for human consumption, if False, return
-        a dictionary of the components in the outfit
         :type kwargs: additional forecasting features supported by the particular activity class see
         _supported_features contains this list of useful arguments
         :param duration: length of activity in minutes
@@ -350,6 +232,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
             (cat_model, bool_model) = self.rebuild_models()
         return cat_model, bool_model
 
+
     def _are_models_upto_date(self, cat_model_path, raw_data_path, boolean_model_path):
         """ Determine if the model files exist and if so, is the raw data file newer
 
@@ -366,7 +249,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         return files_exist and bool_is_newer and cat_is_newer
 
     @property
-    def outfit_(self):
+    def outfit_(self) ->dict:
         return self.__outfit
 
     def rebuild_models(self) -> (MultiOutputClassifier, MultiOutputClassifier):
@@ -470,52 +353,248 @@ class BaseOutfitPredictor(BaseActivityMixin):
             bool_model = pickle.load(bf)
         return cat_model, bool_model
 
-    @outfit_.setter
-    def outfit_(self, value):
-        self._outfit_ = value
-
-
-class RunningOutfitMixin(BaseActivityMixin):
-    """ Provides an override for the components that are unique to running
-
-    """
-
-    def __init__(self):
-        super(RunningOutfitMixin, self).__init__()
-        self._local_outfit_descr = {'Short-sleeve': OutfitComponent('singlet'),
-                                    'Toe cover': None,
-                                    'Boot': None,
-                                    'face_cover': None,
-                                    }
-    @property
-    def activity_name(self):
-        return 'Run'
-
-
-class RunningOutfitTranslator(BaseOutfitTranslator, RunningOutfitMixin):
-    def __init__(self, ):
-        """"""
-        super(RunningOutfitTranslator, self).__init__()
-
+    @outfit_.getter
+    def outfit_(self):
+        return self.__outfit
 
 class RunningOutfitPredictor(BaseOutfitPredictor, RunningOutfitMixin):
     def __init__(self, ):
         """"""
         super(RunningOutfitPredictor, self).__init__()
 
+class BaseOutfitTranslator(BaseActivityMixin):
+    """ This class provides for dealing with the outfit components to full sentence replies
 
-class RoadbikeOutfitMixin(BaseActivityMixin):
+    """
+    _base_statements: ClassVar[Dict[str, str]] = \
+        {'opening':
+            [f'It looks like',
+             f'Oh my,',
+             f'Well,'],
+        'weather':
+            [f'the weather should be',
+             f'Weather underground says'],
+        'clothing':
+            [f'I suggest wearing',
+             f'Based on the weather conditions, you should consider',
+             f'Looks like today would be a good day to wear',
+             f'If I were going out I''d wear'],
+        'closing':
+            [f'Of course, you should always',
+             f'It would be insane not to wear',
+             f'Also, you should always wear',
+             f'And I never go out without']}
+
     def __init__(self):
-        super(RoadbikeOutfitMixin, self).__init__()
-        self._local_outfit_components = {'ears_hat': OutfitComponent('ear covers'),
-                                         'Boot': OutfitComponent('insulated cycling boot'),
-                                         }
+        super(BaseOutfitTranslator, self).__init__()
+        self.logger = logging.getLogger(__name__)
+        self.logger.debug("Creating an instance of %s", self.__class__.__name__)
+        self._temp_offset = 0
+        self._condition_map = {'feels_like': self._get_temp_phrase,
+                                'wind_speed': self._get_windspeed_phrase,
+                                'wind_direction': self._get_winddirection_phrase, }
+        self._local_statements = {}
+
+    def _canned_statements(self, key) -> List[str]:
+        """
+            Get the collection of statement prefixes for different sentence parts
+            :param key: one of 'opening', 'clothing', 'always', 'weather'
+            :return: list of f-strings suitable to use to build up the replies
+        """
+        return ChainMap(self._local_statements, self._base_statements)[key]
+
+    def _opening_statements(self):
+        return self._canned_statements('opening')
+
+    def _clothing_statements(self):
+        return self._canned_statements('clothing')
+
+    def _closing_statements(self):
+        return self._canned_statements('closing')
+
+    def _weather_statements(self):
+        return self._canned_statements('weather')
+
+    def _get_condition_phrase(self, condition_type, condition):
+        """
+        For a particular condition, call the associated function to help build out the condition phrase
+
+        For instance, if the condition_type is temp and the value is 40 then it may reply with
+        'it's going to be chilly'.  Or if the condition_type is humidity and the value is 90% the reply may be
+        that it going to be muggy.
+
+        The base class supports 'temp', and 'wind_speed'
+        :param condition_type: a condition specified in the __condition_map keys for this translator
+        :param condition: the value of that condition
+        :return: a phrase which describes the condition, if there is a function that translates this condition for
+        the particular activity.
+        """
+        if condition_type in self._condition_map:
+            cond_func = self._condition_map[condition_type]
+            return cond_func(condition)
+
+    @staticmethod
+    def _get_windspeed_phrase(wind_speed):
+        """
+        Given the wind speed, prepare a description of the wind conditions
+        :param wind_speed: the wind speed in MPH
+        :return: description of the wind condition
+        """
+        assert isinstance(float(wind_speed), float)
+        reply = ""
+        if wind_speed < 10:
+            reply = "calm"
+        elif wind_speed < 15:
+            reply = "breezy"
+        elif wind_speed < 20:
+            reply = "windy"
+        else:
+            reply = "very windy"
+        return reply
+
+    @staticmethod
+    def _get_temp_phrase(temp_f):
+        """ Given a temperature (Farenheit), return a key (condition) used
+            to gather up configuratons
+        """
+        assert isinstance(float(temp_f), float)
+        t = temp_f
+        if t < 40:
+            condition = "cold"
+        elif t < 48:
+            condition = "cool"
+        elif t < 58:
+            condition = "mild"
+        elif t < 68:
+            condition = "warm"
+        elif t < 75:
+            condition = "very warm"
+        else:
+            condition = "hot"
+        return condition
+
+    @staticmethod
+    def _get_winddirection_phrase(direction):
+        return direction
+
+    # These are defined as properties so that they could be overridden in subclasses if desired
+    @property
+    def opening_prefix(self):
+        return random.choice(self._opening_statements()) + " it is going to be "
 
     @property
-    def activity_name(self):
-        return 'Run'
+    def weather_prefix(self):
+        return random.choice(self._opening_statements()) + " it is going to be"
 
+    @property
+    def clothing_prefix(self):
+        # For example
+        # A:  I suggest you wear .....
+        return random.choice(self._clothing_statements())
+
+    @property
+    def closing_prefix(self):
+        # For example
+        #  A:  Of course, ALWAYS wear .... (helmet / sunscreen)
+        return random.choice(self._closing_statements())
+
+    def _get_component_description(self, item_key, use_alt_name=False) -> str:
+        """ Determine the proper description of the items that are to be worn (or not)
+
+        This method allows for subclasses to override the default descriptions or to provide alternative
+        'false_names'.  False names is a simple way to handle the situation where there are only two options -
+        for instance heavy_socks.  If not recommending heavy socks then we recommend regular socks.
+        It would be irregular to suggest wearing two kinds of socks, so two alternatives makes sense
+
+        :param item_key: the item for which the description should be fetched
+        :param use_alt_name:  if the algorithm says don't get this value, then if there is an alternative return that
+        :return: string with the description of the item component, None if not applicable
+        """
+        item_description = None
+        item = None
+        if (self.clothing_descriptions is not None) and item_key in self.clothing_descriptions:
+            item = self.clothing_descriptions[item_key]
+        if item is not None:
+            item_description = item.alt_description if use_alt_name else item.description
+        return item_description
+
+    def build_reply(self, outfit_items, conditions=None) -> str:
+        """ Once the outfit has been predicted this will return the human readable string response
+
+        :type outfit_items: dictionary[str,bool]
+        :param outfit_items: the list of items that should be considered, these need to match the names in the
+        outfit_components otherwise we have a problem.
+        :type conditions dictionary[str, obj]
+        :param conditions: a collection of conditions which help to personalize the recommendation
+        :return: string representing the human readable outfit options
+        """
+        if outfit_items is None:
+            return ""
+
+        # We can iterate this list, but some of it is descriptions, some are true/false components
+        # so we need to decide what kind it is and deal with it accordingly
+
+        #  Go through the items we want to output for this translator and just get the descriptions for them
+        outfit_items_descriptions = []
+        for i in outfit_items.items():
+            if i[1] is bool:
+                oi = self._get_component_description(i[0], i[1])
+            else:
+                oi = self._get_component_description(i[1])
+            outfit_items_descriptions.append(oi)
+
+        reply = self._build_opening()
+        reply_conditions = ""
+        if conditions:
+            replies = [self._get_condition_phrase(cond_type, cond) for cond_type, cond in conditions.items()]
+            reply_conditions += self._build_generic_from_list(replies)
+        reply += f'{reply_conditions}.\n' \
+            f'{self._build_reply_main(outfit_items_descriptions)}. {self._build_always_reply()}'
+        return reply
+
+    def _build_opening(self):
+        return self.opening_prefix
+
+    def _build_always_reply(self):
+        reply_always = ""
+        return reply_always
+
+    def _build_reply_main(self, outfit_item_descriptions: [str]) -> object:
+        if outfit_item_descriptions is None:
+            raise (ValueError())
+        reply_clothing = f'{self.clothing_prefix} {self._build_generic_from_list(outfit_item_descriptions)}'
+        return reply_clothing
+
+    @staticmethod
+    def _build_generic_from_list(aspects) -> str:
+        ''' Build a reply from the list of aspects (outfit components, weather conditions, etc)
+
+        :param aspects: list of things to be put into a full sentence reply
+        :return: full sentence reply given the list of items passed to the function
+        '''
+        reply = ""
+        for item in aspects:
+            if item is not None:
+                reply += f'{item}, '
+        reply = reply.strip(', ')
+        pos = reply.rfind(',')
+        # Here we are just taking out the last , to replace it with 'and'
+        if pos > 0:
+            reply = reply[:pos] + " and" + reply[pos + 1:]
+            reply = reply.replace("and and", "and")
+        return reply
+
+class RunningOutfitTranslator(BaseOutfitTranslator, RunningOutfitMixin):
+    def __init__(self, ):
+        """"""
+        super(RunningOutfitTranslator, self).__init__()
 
 class RoadbikeOutfitTranslator(BaseOutfitTranslator, RoadbikeOutfitMixin):
     def __init__(self):
         super(RoadbikeOutfitTranslator, self).__init__()
+
+
+
+
+
+

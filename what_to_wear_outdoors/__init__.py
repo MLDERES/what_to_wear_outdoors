@@ -1,8 +1,6 @@
 """Top-level package for What to Wear Outdoors."""
 import logging
-
-from .clothing_options_ml import *
-from .train_model import *
+from .outfit_predictors import *
 from .weather_observation import *
 from .utility import *
 

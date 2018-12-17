@@ -10,7 +10,6 @@ __all__ = ['Forecast', 'Weather']
 # TODO: Put this back so that we aren't shipping the API key with the code
 dotenv.load_dotenv()
 WU_API_KEY = os.getenv("WU_API_KEY")
-WU_API_KEY = '7d65568686ff9c25'
 if WU_API_KEY is None:
     raise EnvironmentError(
         "The environment variable WU_API_KEY is required to run this program.")
@@ -40,6 +39,7 @@ WIND_SPEED_KEY = 'wspd'  # also read dictionary of 'english' or 'metric'
 RAIN_CHANCE_KEY = 'pop'  # probability of precipitation
 NULL_VALUE = -999
 HUMIDITY_KEY = 'humidity'
+
 
 class JsonDictionary(dict):
 
@@ -75,11 +75,11 @@ class Forecast:
 
     def __str__(self):
         return f'Forecast for {self.location} ' \
-               f'on {self.dow} (Month-Day): {self.mth}-{self.month_day} ' \
-               f'at {self.civil_time}. ' \
-               f'\n\tTemperature (feels like): {self.feels_like_f} °F' \
-               f'\n\tWind {self.wind_speed} mph from {self.wind_dir}' \
-               f'\n\tConditions: {self.condition} ' \
+            f'on {self.dow} (Month-Day): {self.mth}-{self.month_day} ' \
+            f'at {self.civil_time}. ' \
+            f'\n\tTemperature (feels like): {self.feels_like_f} °F' \
+            f'\n\tWind {self.wind_speed} mph from {self.wind_dir}' \
+            f'\n\tConditions: {self.condition} ' \
             f'\n\tChance of precipitation: {self.precip_chance} %' \
             f'\n\tHumidity: {self.humidity}'
 
@@ -137,24 +137,33 @@ class Weather:
     This function gets an hourly forecast for the next 10 days.
     '''
 
-    def get_forecast(self, dt, location='72712', dbg=False):
+    def get_forecast(self, dt, location: str = '72712', dbg: bool = False) -> Forecast:
+        """
+        Get the forecast for a given location and a given day/time.
+        :param dt: the day and time for when the forecast should be queried
+        :type location: string
+        :param location: location should be either a zip code or a city, state abbreviation 
+        :param bool param_name: dbg: if True, read the forecast from a file rather than querying the web service
+        :return: a Forecast object
+        """"""
+
+        """
         # dt should be the date and the time
         logging.debug('get_weather location = ' + location)
         logging.debug('date time = {}'.format(dt))
 
         fct_key = Forecast.get_fct_key(dt.day, dt.month, dt.hour)
-        if (_All_Forecasts_Location[location] is None or _All_Forecasts_Location[location][fct_key] is None):
-            weather_request = Weather._build_weather_request(
-                location)  # +'/geolookup/conditions/hourly/q/'+city+'.json'
+        if _All_Forecasts_Location[location] is None or _All_Forecasts_Location[location][fct_key] is None:
+            weather_request = Weather._build_weather_request(location) # +'/geolookup/conditions/hourly/q/'+city+'.json'
             resp = requests.get(weather_request)
-            if (resp.status_code == 200):
+            if resp.status_code == 200:
                 wu_response = resp.json()
                 if dbg:
                     with open('sample_forecast.json', 'w') as fp:
                         json.dump(wu_response, fp)
                 _All_Forecasts_Location[location] = self._build_forecasts(wu_response, location)
             else:
-                print('Danger Will Robinson we got a bad response from WU {resp.status_code}')
+                print(f'Danger Will Robinson we got a bad response from WU {resp.status_code}')
 
         return _All_Forecasts_Location[location][fct_key]
 
@@ -178,7 +187,7 @@ class Weather:
         # query = location (ST/City, zipcode,Country/City, or lat,long)
         # format = json or xml
         request = f'http://api.wunderground.com/api/{WU_API_KEY}/hourly10day/q/' \
-                  f'{Weather._build_location_query(location)}.json'
+            f'{Weather._build_location_query(location)}.json'
         return request
 
 

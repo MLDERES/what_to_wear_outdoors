@@ -6,17 +6,12 @@ import click
 import logging
 import textwrap
 
-from what_to_wear_outdoors.clothing_options import Running2
-from what_to_wear_outdoors.outfit_predictors import RunningOutfitPredictor
+from what_to_wear_outdoors.outfit_predictors import RunningOutfitPredictor, RunningOutfitTranslator
 
 if __name__ == '__main__' or __package__ == '':
     from weather_observation import Weather, Forecast
-    from clothing_options_ml import Running
-    from train_model import LogisticModelCreator, ClassifierModelCreator
 else:
     from .weather_observation import Weather, Forecast
-    from .clothing_options_ml import Running
-    from .train_model import LogisticModelCreator, ClassifierModelCreator
 
 # TODO: Manage Command Line Arguments
 #  (-u for update model (with Excel), (-f to ask for forecast) (-d for default config) (no flags for walk-through)
@@ -82,8 +77,8 @@ def cli():
 # @click.argument('datapath', type=click.File(), default='data/what i wore running.xlsx')
 def train_models():
     #TODO: Support using more than one model type to train with
-    mc = LogisticModelCreator()
-    mc.train()
+    rop = RunningOutfitPredictor()
+    rop.rebuild_models()
 
 
 @click.command('demo')
@@ -95,23 +90,24 @@ def demo_mode(duration, windspeed, temp, humidity):
     '''
     This mode is used to specfic the forecast rather than to look up a forecast and depend on the results.
 
+    :type windspeed: float
     :param duration: number of minutes that the activity will last
     :param windspeed: wind speed (mph) at the time of the activity
     :param temp: forecasted (feels like) temperature (F)
-    :param humidity: percent humidty
+    :param humidity: percent humidity
     :return: None
     '''
     hum_pct = humidity if humidity < 1 else humidity / 100
     click.secho(f'\nRecommendation for forecast\n\tTemp:{temp}'
                 f'\n\tWind:{windspeed}\n\tHumidity:{hum_pct*100}%\n\tActivity Duration:{duration}\n')
 
-    r = Running()
-    f = Forecast()
-    f.humidity= humidity
-    f.feels_like_f = temp
-    f.wind_speed = windspeed
-    f.is_daylight = True
-    reply = r.build_reply(f,duration=duration)
+    rop = RunningOutfitPredictor()
+    conditions = dict(feels_like=temp, wind_speed=windspeed, pct_humidity=humidity,
+                      duration=duration, is_light=True)
+
+    outfit = rop.predict_outfit(**conditions)
+    rot = RunningOutfitTranslator()
+    reply = rot.build_reply(outfit, conditions)
     [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(reply)]
 
 
@@ -127,9 +123,14 @@ def auto_mode(dow, hour, location):
     logging.debug(f'Forecast (calculated): {forecast_dt}')
     fct = w.get_forecast(forecast_dt, location)
     print(fct)
-    running = Running()
+    rop = RunningOutfitPredictor()
+    conditions = dict(feels_like=fct.feels_like_f, wind_speed=fct.wind_speed, pct_humidity=fct.humidity,
+                      duration=45, is_light=True)
+    rop = rop.predict_outfit(**conditions)
+    rot = RunningOutfitTranslator()
+    reply = rot.build_reply(rop.outfit_, **conditions)
     print('\n')
-    [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(running.build_reply(fct))]
+    [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(reply)]
 
 
 
@@ -149,7 +150,7 @@ def main():
     click.pause()
     click.clear()
     forecast_dt = prompt_for_date_time()
-    while (forecast_dt <= NOW):
+    while forecast_dt <= NOW:
         click.secho('\nSorry you must choose a date/time that is after the top of the next hour.\n', fg=Colors['Error'])
         forecast_dt = prompt_for_date_time()
 
@@ -158,19 +159,22 @@ def main():
                     fg=Colors['Prompt']),
         default='Fayetteville, AR')
 
+    activity_duration = click.prompt(click.style("How long will you be out?", fg=Colors['Prompt']), default=45)
+
     w = Weather()
     logging.debug(f'Forecast date (calculated): {forecast_dt}')
     fct = w.get_forecast(forecast_dt, activity_location)
     print(fct)
     rop = RunningOutfitPredictor()
-    rop.predict_outfit(        rop.predict_outfit(**{'feels_like': 52, 'wind_speed': 0, 'pct_humidity': .82, 'duration': 50,
-                              'is_light': False}),
-        print(f'{rot.build_reply(rop.outfit_, 52)}'))
+    conditions = dict(feels_like=fct.feels_like_f, wind_speed=fct.wind_speed, pct_humidity=fct.humidity,
+                      duration=activity_duration, is_light=True)
+
+    rop.predict_outfit(**conditions)
+    rot = RunningOutfitTranslator()
+    reply = rot.build_reply(rop.outfit_
+                            , conditions)
     click.secho(f'\n#{"-" * 18}ML OUTPUT{"-" * 18}#',fg=Colors['Output'])
-    [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(running.build_reply(fct))]
-    running2 = Running2()
-    click.secho(f'\n\n#{"-" * 18}STANDARD OUTPUT{"-" * 18}#', fg=Colors['Alternate_Output'])
-    [click.secho(li, fg=Colors['Alternate_Output']) for li in textwrap.wrap(running2.build_reply(fct))]
+    [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(reply)]
 
 
 def prompt_for_date_time():
