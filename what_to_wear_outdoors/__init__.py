@@ -1,13 +1,8 @@
-# -*- coding: utf-8 -*-
 """Top-level package for What to Wear Outdoors."""
 import logging
-import os
-import cli
-from clothing_options import *
-
-from clothing_options_ml import *
-from update_model import *
-from weather_observation import *
+from .outfit_predictors import *
+from .weather_observation import *
+from .utility import *
 
 __author__ = """Michael Dereszynski"""
 __email__ = 'mlderes@hotmail.com'
@@ -25,10 +20,3 @@ formatter = logging.Formatter('%(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 # add the handlers to the logger
 logging.getLogger('').addHandler(ch)
-
-BASE_PATH = os.curdir
-RUNNING_IN_NOTEBOOK = True
-if RUNNING_IN_NOTEBOOK:
-    base_path = 'c:/projects/what_to_wear_outdoors/'
-else:
-    base_path = '..'
