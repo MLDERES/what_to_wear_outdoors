@@ -42,7 +42,7 @@ class OutfitComponent:
     def alt_description(self):
         return self._alt_description
 
-class BaseActivityMixin():
+class BaseActivityMixin:
     """ This class abstracts the categories of outfit pieces that are described by the translator and features
     """
     _prediction_labels: ndarray
