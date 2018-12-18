@@ -42,6 +42,7 @@ class OutfitComponent:
     def alt_description(self):
         return self._alt_description
 
+
 class BaseActivityMixin:
     """ This class abstracts the categories of outfit pieces that are described by the translator and features
     """
@@ -123,6 +124,14 @@ class BaseActivityMixin:
     def prediction_labels(self):
         return self._prediction_labels
 
+    @property
+    def outfit_component_options(self):
+        opt = self._categorical_targets.copy()
+        for i in self._boolean_labels:
+            opt[i] = ['n', 'y']
+        return opt
+
+
 class RunningOutfitMixin(BaseActivityMixin):
     """ Provides an override for the components that are unique to running
 
@@ -135,9 +144,11 @@ class RunningOutfitMixin(BaseActivityMixin):
                                     'Boot': None,
                                     'face_cover': None,
                                     }
+
     @property
     def activity_name(self):
         return 'Run'
+
 
 class RoadbikeOutfitMixin(BaseActivityMixin):
     def __init__(self):
@@ -149,6 +160,7 @@ class RoadbikeOutfitMixin(BaseActivityMixin):
     @property
     def activity_name(self):
         return 'Roadbike'
+
 
 class BaseOutfitPredictor(BaseActivityMixin):
     """ This class provides the common methods required to predict the clothing need to go outside for a given
@@ -232,7 +244,6 @@ class BaseOutfitPredictor(BaseActivityMixin):
             (cat_model, bool_model) = self.rebuild_models()
         return cat_model, bool_model
 
-
     def _are_models_upto_date(self, cat_model_path, raw_data_path, boolean_model_path):
         """ Determine if the model files exist and if so, is the raw data file newer
 
@@ -249,7 +260,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         return files_exist and bool_is_newer and cat_is_newer
 
     @property
-    def outfit_(self) ->dict:
+    def outfit_(self) -> dict:
         return self.__outfit
 
     def rebuild_models(self) -> (MultiOutputClassifier, MultiOutputClassifier):
@@ -340,6 +351,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
 
         return full_ds
 
+
     def load_models(self):
         """
         Go to the default models directory and load up both the boolean and categorical models
@@ -357,10 +369,12 @@ class BaseOutfitPredictor(BaseActivityMixin):
     def outfit_(self):
         return self.__outfit
 
+
 class RunningOutfitPredictor(BaseOutfitPredictor, RunningOutfitMixin):
     def __init__(self, ):
         """"""
         super(RunningOutfitPredictor, self).__init__()
+
 
 class BaseOutfitTranslator(BaseActivityMixin):
     """ This class provides for dealing with the outfit components to full sentence replies
@@ -368,22 +382,22 @@ class BaseOutfitTranslator(BaseActivityMixin):
     """
     _base_statements: ClassVar[Dict[str, str]] = \
         {'opening':
-            [f'It looks like',
-             f'Oh my,',
-             f'Well,'],
-        'weather':
-            [f'the weather should be',
-             f'Weather underground says'],
-        'clothing':
-            [f'I suggest wearing',
-             f'Based on the weather conditions, you should consider',
-             f'Looks like today would be a good day to wear',
-             f'If I were going out I''d wear'],
-        'closing':
-            [f'Of course, you should always',
-             f'It would be insane not to wear',
-             f'Also, you should always wear',
-             f'And I never go out without']}
+             [f'It looks like',
+              f'Oh my,',
+              f'Well,'],
+         'weather':
+             [f'the weather should be',
+              f'Weather underground says'],
+         'clothing':
+             [f'I suggest wearing',
+              f'Based on the weather conditions, you should consider',
+              f'Looks like today would be a good day to wear',
+              f'If I were going out I''d wear'],
+         'closing':
+             [f'Of course, you should always',
+              f'It would be insane not to wear',
+              f'Also, you should always wear',
+              f'And I never go out without']}
 
     def __init__(self):
         super(BaseOutfitTranslator, self).__init__()
@@ -391,8 +405,10 @@ class BaseOutfitTranslator(BaseActivityMixin):
         self.logger.debug("Creating an instance of %s", self.__class__.__name__)
         self._temp_offset = 0
         self._condition_map = {'feels_like': self._get_temp_phrase,
-                                'wind_speed': self._get_windspeed_phrase,
-                                'wind_direction': self._get_winddirection_phrase, }
+                               'wind_speed': self._get_windspeed_phrase,
+                               'wind_direction': self._get_winddirection_phrase,
+                               'condition_human': self._get_weather_condition_phrase,
+                               }
         self._local_statements = {}
 
     def _canned_statements(self, key) -> List[str]:
@@ -423,7 +439,7 @@ class BaseOutfitTranslator(BaseActivityMixin):
         'it's going to be chilly'.  Or if the condition_type is humidity and the value is 90% the reply may be
         that it going to be muggy.
 
-        The base class supports 'temp', and 'wind_speed'
+        The base class supports 'temp','wind_speed', and 'condition'
         :param condition_type: a condition specified in the __condition_map keys for this translator
         :param condition: the value of that condition
         :return: a phrase which describes the condition, if there is a function that translates this condition for
@@ -475,7 +491,15 @@ class BaseOutfitTranslator(BaseActivityMixin):
 
     @staticmethod
     def _get_winddirection_phrase(direction):
-        return direction
+        wind_direction = {'N': 'North', 'NNE': 'North-Northeast', 'NNW': 'North-Northwest',
+                          'ENE': 'East-Northeast', 'WNW': 'West-Northwest', 'E': 'East', 'W': 'West',
+                          'S': 'South', 'SSE': 'South-Southeast', 'SSW': 'South-Southwest',
+                          'ESE': 'East-Southeast', 'WSW': 'West-Southwest'}
+        return wind_direction[direction] if direction in wind_direction else None
+
+    @staticmethod
+    def _get_weather_condition_phrase(cond):
+        return cond
 
     # These are defined as properties so that they could be overridden in subclasses if desired
     @property
@@ -584,17 +608,13 @@ class BaseOutfitTranslator(BaseActivityMixin):
             reply = reply.replace("and and", "and")
         return reply
 
+
 class RunningOutfitTranslator(BaseOutfitTranslator, RunningOutfitMixin):
     def __init__(self, ):
         """"""
         super(RunningOutfitTranslator, self).__init__()
 
+
 class RoadbikeOutfitTranslator(BaseOutfitTranslator, RoadbikeOutfitMixin):
     def __init__(self):
         super(RoadbikeOutfitTranslator, self).__init__()
-
-
-
-
-
-

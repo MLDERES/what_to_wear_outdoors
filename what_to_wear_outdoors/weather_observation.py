@@ -1,3 +1,5 @@
+import random
+from numpy.random import choice
 import requests
 import dotenv
 import os
@@ -39,6 +41,10 @@ WIND_SPEED_KEY = 'wspd'  # also read dictionary of 'english' or 'metric'
 RAIN_CHANCE_KEY = 'pop'  # probability of precipitation
 NULL_VALUE = -999
 HUMIDITY_KEY = 'humidity'
+WIND_DIRECTION = {'N': 'North', 'NNE': 'North-Northeast', 'NNW': 'North-Northwest',
+                  'ENE': 'East-Northeast', 'WNW': 'West-Northwest', 'E': 'East', 'W': 'West',
+                  'S': 'South', 'SSE': 'South-Southeast', 'SSW': 'South-Southwest',
+                  'ESE': 'East-Southeast', 'WSW': 'West-Southwest'}
 
 
 class JsonDictionary(dict):
@@ -54,24 +60,28 @@ class JsonDictionary(dict):
 
 
 class Forecast:
-    def __init__(self):
+    WIND_DIRECTIONS = ['N', 'NNE', '']
+
+    def __init__(self, location="", condition="", condition_human="", feels_like_f=0, heat_index_f=0, temp_f=0,
+                 wind_dir='', wind_speed=0, precip_chance=0, tod=0, month_day=1, mth=1, dow='Unknown',
+                 civil_time='00:00 AM', humidity=0, is_daylight=True):
         super(Forecast, self).__init__()
-        self.location = ""
-        self.condition = ""
-        self.condition_human = ""
-        self.feels_like_f = 0
-        self.heat_index_f = 0
-        self.temp_f = 0
-        self.wind_dir = ''
-        self.wind_speed = 0
-        self.precip_chance = 0
-        self.tod = 0
-        self.month_day = 1
-        self.mth = 1
-        self.dow = 'Unknown'
-        self.civil_time = '00:00 AM'
-        self.humidity = 0
-        self.is_daylight = True
+        self.location = location
+        self.condition = condition
+        self.condition_human = condition_human
+        self.feels_like_f = feels_like_f
+        self.heat_index_f = heat_index_f
+        self.temp_f = temp_f
+        self.wind_dir = wind_dir
+        self.wind_speed = wind_speed
+        self.precip_chance = precip_chance
+        self.tod = tod
+        self.month_day = month_day
+        self.mth = mth
+        self.dow = dow
+        self.civil_time = civil_time
+        self.humidity = humidity
+        self.is_daylight = is_daylight
 
     def __str__(self):
         return f'Forecast for {self.location} ' \
@@ -79,7 +89,7 @@ class Forecast:
             f'at {self.civil_time}. ' \
             f'\n\tTemperature (feels like): {self.feels_like_f} °F' \
             f'\n\tWind {self.wind_speed} mph from {self.wind_dir}' \
-            f'\n\tConditions: {self.condition} ' \
+            f'\n\tConditions: {self.condition_human} ' \
             f'\n\tChance of precipitation: {self.precip_chance} %' \
             f'\n\tHumidity: {self.humidity}'
 
@@ -120,6 +130,25 @@ class Weather:
     def __init__(self):
         pass
 
+    @staticmethod
+    def random_forecast() -> Forecast:
+        """ Get a random forecast.
+
+            Used for building up the dataset
+
+        :return: a Forecast
+        """
+        f = Forecast()
+        f.humidity = round(random.normalvariate(55, 20))
+        f.temp_f = f.feels_like_f = round(random.normalvariate(55, 20))
+        f.tod = random.randrange(5, 21)
+        pchance = random.randrange(0, 100, step=10)
+        f.precip_chance = 0 if pchance < 20 else (100 if pchance > 80 else pchance)
+        f.wind_speed = min(0, round(random.normalvariate(8, 8)))
+        f.wind_dir = random.choice(list(WIND_DIRECTION.keys()))
+        f.condition_human = random.choice(WEATHER_CONDITIONS)
+        return f
+
     def _build_forecasts(self, dct, location=''):
         forecasts = {}
         if FORECAST_KEY in dct:
@@ -154,7 +183,8 @@ class Weather:
 
         fct_key = Forecast.get_fct_key(dt.day, dt.month, dt.hour)
         if _All_Forecasts_Location[location] is None or _All_Forecasts_Location[location][fct_key] is None:
-            weather_request = Weather._build_weather_request(location) # +'/geolookup/conditions/hourly/q/'+city+'.json'
+            weather_request = Weather._build_weather_request(
+                location)  # +'/geolookup/conditions/hourly/q/'+city+'.json'
             resp = requests.get(weather_request)
             if resp.status_code == 200:
                 wu_response = resp.json()
@@ -193,3 +223,25 @@ class Weather:
 
 # Keep track of all the forecasts we have gotten by location
 _All_Forecasts_Location = JsonDictionary()
+WEATHER_CONDITIONS = ['Clear', 'Heavy Fog', 'Heavy Fog Patches', 'Heavy Freezing Drizzle', 'Heavy Freezing Fog',
+                      'Heavy Freezing Rain', 'Heavy Hail', 'Heavy Hail Showers', 'Heavy Haze', 'Heavy Mist',
+                      'Heavy Rain', 'Heavy Rain Mist',
+                      'Heavy Rain Showers', 'Heavy Small Hail Showers', 'Heavy Snow', 'Heavy Snow Blowing Snow Mist',
+                      'Heavy Snow Grains', 'Heavy Snow Showers',
+                      'Heavy Spray', 'Heavy Thunderstorm', 'Heavy Thunderstorms and Ice Pellets',
+                      'Heavy Thunderstorms and Rain',
+                      'Heavy Thunderstorms and Snow', 'Heavy Thunderstorms with Hail',
+                      'Heavy Thunderstorms with Small Hail', 'Heavy Drizzel',
+                      'Light Fog', 'Light Fog Patches', 'Light Freezing Drizzle', 'Light Freezing Fog',
+                      'Light Freezing Rain', 'Light Hail',
+                      'Light Hail Showers', 'Light Haze', 'Light Mist', 'Light Rain', 'Light Rain Mist',
+                      'Light Rain Showers', 'Light Sandstorm',
+                      'Light Small Hail Showers', 'Light Snow', 'Light Snow Blowing Snow Mist', 'Light Snow Grains',
+                      'Light Snow Showers',
+                      'Light Spray', 'Light Thunderstorm', 'Light Thunderstorms and Ice Pellets',
+                      'Light Thunderstorms and Rain',
+                      'Light Thunderstorms and Snow', 'Light Thunderstorms with Hail',
+                      'Light Thunderstorms with Small Hail',
+                      'Light Drizzel', 'Mostly Cloudy', 'Overcast', 'Partial Fog', 'Partly Cloudy', 'Patches of Fog',
+                      'Scattered Clouds',
+                      'Shallow Fog', 'Small Hail', 'Squalls', 'Unknown', 'Unknown Precipitation']

@@ -20,3 +20,4 @@ formatter = logging.Formatter('%(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 # add the handlers to the logger
 logging.getLogger('').addHandler(ch)
+
