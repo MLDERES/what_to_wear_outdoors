@@ -6,8 +6,7 @@ import random
 import warnings
 from collections import ChainMap
 from pathlib import Path
-from typing import List, Dict, ClassVar
-
+from typing import List, Dict, ClassVar, Callable, Any, Union
 import pandas as pd
 import numpy as np
 from numpy.core.multiarray import ndarray
@@ -15,6 +14,10 @@ from pandas.core.dtypes.dtypes import CategoricalDtype
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.tree import DecisionTreeClassifier
 from abc import abstractmethod
+import datetime as dt
+from what_to_wear_outdoors.weather_observation import FctKeys, WIND_DIRECTION
+
+NOW = dt.datetime.now()
 
 if __package__ == '' or __name__ == '__main__':
     from utility import get_data_path, get_boolean_model, get_categorical_model
@@ -28,8 +31,8 @@ class OutfitComponent:
     def __init__(self, description, alt_description=None):
         """
 
-        :param name: key which will be used to determine the type
-        :param alternative_name: if not this item then what else.  (i.e. if not heavy socks then regular socks)
+        :param description: key which will be used to determine the type
+        :param alt_description: if not this item then what else.  (i.e. if not heavy socks then regular socks)
         """
         self._description = description
         self._alt_description = alt_description
@@ -91,12 +94,9 @@ class BaseActivityMixin:
                                      'lower_body': self._leg_categories,
                                      'shoe_cover': self._shoe_cover_categories,
                                      }
-        self._boolean_targets = \
-            self._boolean_labels = ['ears_hat', 'gloves', 'heavy_socks', 'arm_warmers', 'face_cover', ]
-        self._outfit_classes = [*self._categorical_targets.keys()] + self._boolean_targets
         self._categorical_labels = [*self._categorical_targets.keys()]
-        self._prediction_labels = np.concatenate((self._categorical_labels, self._boolean_labels), axis=None)
-
+        self._boolean_targets = ['ears_hat', 'gloves', 'heavy_socks', 'arm_warmers', 'face_cover', ]
+        self._outfit_classes = self._categorical_labels + self._boolean_targets
         logger.debug("Creating an instance of %s", self.__class__.__name__)
 
     @property
@@ -122,12 +122,16 @@ class BaseActivityMixin:
 
     @property
     def prediction_labels(self):
-        return self._prediction_labels
+        """
+        Column names for items of clothing that are going to be predicted
+        :return:
+        """
+        return self._outfit_classes
 
     @property
     def outfit_component_options(self):
         opt = self._categorical_targets.copy()
-        for i in self._boolean_labels:
+        for i in self._boolean_targets:
             opt[i] = ['n', 'y']
         return opt
 
@@ -175,6 +179,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
                                     'categorical': ['is_light']}
         self.__outfit = {}
         self._temp_f = 0
+        self._sample_data = None
         logger.debug("Creating an instance of %s", self.__class__.__name__)
 
     @property
@@ -190,7 +195,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         return names
 
     # TODO: Handle Imperial and Metric measures (Celsius and kph wind speed)
-    def predict_outfit(self, **kwargs: object) -> Dict[str, str]:
+    def predict_outfit(self, **kwargs) -> Dict[str, Union[str, bool]]:
         """ Predict the clothing options that would be appropriate for an outdoor activity.
         :type kwargs: additional forecasting features supported by the particular activity class see
         _supported_features contains this list of useful arguments
@@ -222,6 +227,38 @@ class BaseOutfitPredictor(BaseActivityMixin):
         self.__outfit = results
 
         return results
+
+    def add_to_sample_data(self, forecast, outfit, athlete_name='default', **kwargs):
+        """
+        Add a row of sample data to a model file.
+        :param forecast:
+        :param outfit:
+        :param athlete_name:
+        :return:
+        """
+        # Check to see if we have a dataframe already
+        # If there is no dataframe, then create one
+        if self._sample_data is None:
+            self._sample_data = self.get_dataframe_format()
+
+        # Add the required lines to the dataframe from the supplied info
+        forecast = vars(forecast) if type(forecast) is not dict else forecast
+        fields = {x: outfit[x] for x in self.prediction_labels if x in outfit}
+        fields.update({x: forecast[x] for x in self.features if x in forecast})
+        fields.update({x: kwargs[x] for x in self.features + self.prediction_labels if x in kwargs})
+        self._sample_data.append(fields, ignore_index=True)
+        return self._sample_data
+
+    def write_sample_data(self, filename=""):
+        """
+        Write the sample data to the file specified
+        :param filename:
+        :return:
+        """
+        fn = get_data_path(f'outfit_data_{NOW.day}{NOW.month}{NOW.hour}{NOW.minute}.csv') \
+            if filename == '' else filename
+        if self._sample_data is None:
+            ReferenceError('No sample data has been created yet.')
 
     def get_models(self):
         """ Get the categorical and boolean models
@@ -276,7 +313,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         full_train_ds.drop(['Athlete', 'activity', 'activity_date'], axis='columns', inplace=True)
 
         # 'weather_condition', 'is_light', 'wind_speed', 'wind_dir', 'temp',
-        # 'feels_like_temp', 'pct_humidity', 'ears_hat', 'outer_layer',
+        # 'feels_like', 'pct_humidity', 'ears_hat', 'outer_layer',
         # 'base_layer', 'arm_warmers', 'jacket', 'gloves', 'lower_body',
         # 'heavy_socks', 'shoe_cover', 'face_cover', 'activity_month',
         # 'activity_length']
@@ -328,9 +365,9 @@ class BaseOutfitPredictor(BaseActivityMixin):
         logger.debug(f'Data file shape: {data_file}')
         full_ds.rename(
             {'Date': 'activity_date', 'Time': 'activity_hour', 'Activity': 'activity', 'Distance': 'distance',
-             'Length of activity (min)': 'duration', 'Condition': 'weather_condition', 'Light': 'is_light',
-             'Wind': 'wind_speed', 'Wind Dir': 'wind_dir', 'Temp': 'temp', 'Feels like': 'feels_like',
-             'Humidity': 'pct_humidity',
+             'Length of activity (min)': 'duration', 'Condition': FctKeys.CONDITION, 'Light': 'is_light',
+             'Wind': FctKeys.WIND_SPEED, 'Wind Dir': FctKeys.WIND_DIR, 'Temp': FctKeys.REAL_TEMP,
+             'Feels like': FctKeys.FEEL_TEMP, 'Humidity': FctKeys.HUMIDITY,
              'Hat-Ears': 'ears_hat', 'Outer Layer': 'outer_layer', 'Base Layer': 'base_layer',
              'Arm Warmers': 'arm_warmers', 'Jacket': 'jacket', 'Gloves': 'gloves',
              'LowerBody': 'lower_body', 'Shoe Covers': 'shoe_cover', 'Face Cover': 'face_cover',
@@ -351,6 +388,9 @@ class BaseOutfitPredictor(BaseActivityMixin):
 
         return full_ds
 
+    def get_dataframe_format(self):
+        df = self.prepare_data()
+        return df.truncate(after=-1)
 
     def load_models(self):
         """
@@ -403,12 +443,15 @@ class BaseOutfitTranslator(BaseActivityMixin):
         super(BaseOutfitTranslator, self).__init__()
         self.logger = logging.getLogger(__name__)
         self.logger.debug("Creating an instance of %s", self.__class__.__name__)
+
         self._temp_offset = 0
-        self._condition_map = {'feels_like': self._get_temp_phrase,
-                               'wind_speed': self._get_windspeed_phrase,
-                               'wind_direction': self._get_winddirection_phrase,
-                               'condition_human': self._get_weather_condition_phrase,
-                               }
+        #
+        self._condition_map: Dict[str, Callable[[Any, Dict[str, Any]], str]] = \
+            {FctKeys.FEEL_TEMP: self._get_temp_phrase,
+             FctKeys.WIND_SPEED: self._get_windspeed_phrase,
+             FctKeys.CONDITION: self._get_weather_condition_phrase,
+             FctKeys.PRECIP_PCT: self._get_precipitation_phrase
+             }
         self._local_statements = {}
 
     def _canned_statements(self, key) -> List[str]:
@@ -431,7 +474,7 @@ class BaseOutfitTranslator(BaseActivityMixin):
     def _weather_statements(self):
         return self._canned_statements('weather')
 
-    def _get_condition_phrase(self, condition_type, condition):
+    def _get_condition_phrase(self, condition_type, condition, all_conditions=None):
         """
         For a particular condition, call the associated function to help build out the condition phrase
 
@@ -447,10 +490,14 @@ class BaseOutfitTranslator(BaseActivityMixin):
         """
         if condition_type in self._condition_map:
             cond_func = self._condition_map[condition_type]
-            return cond_func(condition)
+            return cond_func(condition, all_conditions)
 
     @staticmethod
-    def _get_windspeed_phrase(wind_speed):
+    def _get_precipitation_phrase(pop_chance, all_conditions=None):
+        return None
+
+    @staticmethod
+    def _get_windspeed_phrase(wind_speed, all_conditions=None):
         """
         Given the wind speed, prepare a description of the wind conditions
         :param wind_speed: the wind speed in MPH
@@ -466,10 +513,15 @@ class BaseOutfitTranslator(BaseActivityMixin):
             reply = "windy"
         else:
             reply = "very windy"
+        d = None
+        if all_conditions and FctKeys.WIND_DIR in all_conditions:
+            direction = all_conditions[FctKeys.WIND_DIR]
+            d = WIND_DIRECTION[direction] if direction in WIND_DIRECTION else None
+        reply = f'{reply}, {wind_speed} miles per hour out of the {d}' if d else reply
         return reply
 
     @staticmethod
-    def _get_temp_phrase(temp_f):
+    def _get_temp_phrase(temp_f, all_conditions=None):
         """ Given a temperature (Farenheit), return a key (condition) used
             to gather up configuratons
         """
@@ -490,15 +542,7 @@ class BaseOutfitTranslator(BaseActivityMixin):
         return condition
 
     @staticmethod
-    def _get_winddirection_phrase(direction):
-        wind_direction = {'N': 'North', 'NNE': 'North-Northeast', 'NNW': 'North-Northwest',
-                          'ENE': 'East-Northeast', 'WNW': 'West-Northwest', 'E': 'East', 'W': 'West',
-                          'S': 'South', 'SSE': 'South-Southeast', 'SSW': 'South-Southwest',
-                          'ESE': 'East-Southeast', 'WSW': 'West-Southwest'}
-        return wind_direction[direction] if direction in wind_direction else None
-
-    @staticmethod
-    def _get_weather_condition_phrase(cond):
+    def _get_weather_condition_phrase(cond, all_conditions=None):
         return cond
 
     # These are defined as properties so that they could be overridden in subclasses if desired

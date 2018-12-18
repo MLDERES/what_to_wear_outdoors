@@ -1,13 +1,20 @@
 import os
+import random
 from pathlib import Path
 from unittest import TestCase
 from sklearn.multioutput import MultiOutputClassifier
 
-from what_to_wear_outdoors import utility
+from what_to_wear_outdoors import utility, Weather, FctKeys
 from what_to_wear_outdoors.outfit_predictors import BaseOutfitPredictor, RunningOutfitPredictor
 
 
 class TestBaseOutfitPredictor(TestCase):
+
+    def test_get_dataframe_format(self):
+        rop = RunningOutfitPredictor()
+        df = rop.get_dataframe_format()
+        pass
+
     def test_prepare_data(self):
         bop = BaseOutfitPredictor()
         df = bop.prepare_data()
@@ -16,7 +23,7 @@ class TestBaseOutfitPredictor(TestCase):
     def test_predictors(self):
         bop = BaseOutfitPredictor()
         p = bop.features
-        self.assertListEqual(['feels_like', 'wind_speed', 'pct_humidity', 'duration', 'is_light'], p)
+        self.assertListEqual([FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY, 'duration', 'is_light'], p)
 
     def test_rebuild_models(self):
         """
@@ -84,4 +91,16 @@ class TestBaseOutfitPredictor(TestCase):
             {'outer_layer': 'Short-sleeve', 'base_layer': 'Short-sleeve', 'jacket': 'None',
              'lower_body': 'Shorts', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
              'heavy_socks': False, 'arm_warmers': False, 'face_cover': False})
+
+    def test_add_to_sample_data(self):
+        rop = RunningOutfitPredictor()
+        f = Weather.random_forecast()
+        outfit = {'outer_layer': 'Short-sleeve', 'base_layer': 'Short-sleeve', 'jacket': 'None',
+             'lower_body': 'Shorts', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
+             'heavy_socks': False, 'arm_warmers': False, 'face_cover': False}
+        d = min(20,random.normalvariate(45, 45))
+        df = rop.add_to_sample_data(f, outfit, duration=d)
+        print(df)
+        df = rop.add_to_sample_data(vars(f), outfit, duration=d)
+        print(df)
 

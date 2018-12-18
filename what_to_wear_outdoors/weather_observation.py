@@ -1,4 +1,6 @@
 import random
+from enum import Enum
+
 from numpy.random import choice
 import requests
 import dotenv
@@ -18,33 +20,29 @@ if WU_API_KEY is None:
 
 # So lets just key our observations off of mon_day_year
 #  We'll store pretty date for whatever reason
-FORECAST_KEY = 'hourly_forecast'
-FCAST_TIME_KEY = 'FCTTIME'
 DATE_KEY = 'UTCDATE'
 DATE_HOUR = 'hour'
 DATE_MONTH = 'mon'
 DATE_DAY = 'mday'
 DATE_YEAR = 'year'
 DAY_OF_WEEK = 'weekday_name'
-CIVIL = 'civil'
-
-CONDITION_KEY = 'condition'  # this would be the technical description
-FANCY_COND_KEY = 'wx'  # this is the human readable condition
-FEELS_LIKE_KEY = 'feelslike'  # then there is a dict of 'english' or 'metric'
-METRIC_KEY = 'metric'
-ENG_KEY = 'english'
-HEAT_IDX_KEY = 'heatindex'
-UV_INDEX_KEY = 'uvi'
-TEMP_KEY = 'temp'
-WIND_DIR_KEY = 'wdir'  # but then we need the 'dir' or 'degrees' key to get it
-WIND_SPEED_KEY = 'wspd'  # also read dictionary of 'english' or 'metric'
-RAIN_CHANCE_KEY = 'pop'  # probability of precipitation
+FORECAST_KEY = 'hourly_forecast'
+FCAST_TIME_KEY = 'FCTTIME'
 NULL_VALUE = -999
-HUMIDITY_KEY = 'humidity'
-WIND_DIRECTION = {'N': 'North', 'NNE': 'North-Northeast', 'NNW': 'North-Northwest',
-                  'ENE': 'East-Northeast', 'WNW': 'West-Northwest', 'E': 'East', 'W': 'West',
-                  'S': 'South', 'SSE': 'South-Southeast', 'SSW': 'South-Southwest',
-                  'ESE': 'East-Southeast', 'WSW': 'West-Southwest'}
+
+class FctKeys:
+    """
+    This class provides a common set of column names to be used in dictionaries, dataframes and other places
+    so that there is one place to update the string and it will be hit everywhere
+    """
+    HUMIDITY = 'pct_humidity'
+    FEEL_TEMP = 'feels_like'
+    WIND_SPEED = 'wind_speed'
+    WIND_DIR = 'wind_dir'
+    PRECIP_PCT = 'pct_precip'
+    REAL_TEMP = 'temp_f'
+    HEAT_IDX = 'heat_index'
+    CONDITION = 'condition'
 
 
 class JsonDictionary(dict):
@@ -60,18 +58,16 @@ class JsonDictionary(dict):
 
 
 class Forecast:
-    WIND_DIRECTIONS = ['N', 'NNE', '']
 
-    def __init__(self, location="", condition="", condition_human="", feels_like_f=0, heat_index_f=0, temp_f=0,
+    def __init__(self, location="", condition="", feels_like=0, heat_index_f=0, temp_f=0,
                  wind_dir='', wind_speed=0, precip_chance=0, tod=0, month_day=1, mth=1, dow='Unknown',
                  civil_time='00:00 AM', humidity=0, is_daylight=True):
         super(Forecast, self).__init__()
         self.location = location
         self.condition = condition
-        self.condition_human = condition_human
-        self.feels_like_f = feels_like_f
-        self.heat_index_f = heat_index_f
-        self.temp_f = temp_f
+        self.feels_like = feels_like
+        self.heat_index = heat_index_f
+        self.temp = temp_f
         self.wind_dir = wind_dir
         self.wind_speed = wind_speed
         self.precip_chance = precip_chance
@@ -80,18 +76,18 @@ class Forecast:
         self.mth = mth
         self.dow = dow
         self.civil_time = civil_time
-        self.humidity = humidity
         self.is_daylight = is_daylight
+        self.pct_humidity = humidity
 
     def __str__(self):
         return f'Forecast for {self.location} ' \
             f'on {self.dow} (Month-Day): {self.mth}-{self.month_day} ' \
             f'at {self.civil_time}. ' \
-            f'\n\tTemperature (feels like): {self.feels_like_f} °F' \
+            f'\n\tTemperature (feels like): {self.feels_like} °F' \
             f'\n\tWind {self.wind_speed} mph from {self.wind_dir}' \
-            f'\n\tConditions: {self.condition_human} ' \
+            f'\n\tConditions: {self.condition} ' \
             f'\n\tChance of precipitation: {self.precip_chance} %' \
-            f'\n\tHumidity: {self.humidity}'
+            f'\n\tHumidity: {self.pct_humidity}'
 
     @staticmethod
     def get_fct_key(d=0, m=0, h=0):
@@ -101,26 +97,29 @@ class Forecast:
     def _read_int(i):
         return None if int(i) <= NULL_VALUE else int(i)
 
-    def _read_float(self, f):
+    @staticmethod
+    def _read_float(f):
         return None if float(f) <= NULL_VALUE else float(f)
 
-    def from_dict(self, dct):
+    def from_dict(self, dct, units='english'):
         fcast = Forecast()
+        units = 'english' if units != 'metric' else 'metric'
+
         time_dct = JsonDictionary(dct[FCAST_TIME_KEY])
         fcast.tod = time_dct.read_int(DATE_HOUR)
         fcast.mth = time_dct.read_int(DATE_MONTH)
         fcast.dow = time_dct[DAY_OF_WEEK]
-        fcast.civil_time = time_dct[CIVIL]
+        fcast.civil_time = time_dct['civil']
         fcast.month_day = time_dct.read_int(DATE_DAY)
-        fcast.condition = dct[CONDITION_KEY]
-        fcast.condition_human = dct[FANCY_COND_KEY]
-        fcast.feels_like_f = self._read_float(dct[FEELS_LIKE_KEY][ENG_KEY])
-        fcast.heat_index_f = self._read_float(dct[HEAT_IDX_KEY][ENG_KEY])
-        fcast.temp_f = self._read_float(dct[TEMP_KEY][ENG_KEY])
-        fcast.wind_dir = dct[WIND_DIR_KEY]['dir']
-        fcast.wind_speed = self._read_float(dct[WIND_SPEED_KEY][ENG_KEY])
-        fcast.precip_chance = self._read_float(dct[RAIN_CHANCE_KEY])
-        fcast.humidity = self._read_float(dct[HUMIDITY_KEY])
+        fcast.condition_code = dct['condition'] # this would be the technical description
+        fcast.condition = dct['wx'] # this is the human readable condition
+        fcast.feels_like = self._read_float(dct['feelslike'][units])
+        fcast.heat_index_f = self._read_float(dct['heatindex'][units])
+        fcast.temp_f = self._read_float(dct['temp'][units])
+        fcast.wind_dir = dct['wdir']['dir'] # but then we need the 'dir' or 'degrees' key to get it
+        fcast.wind_speed = self._read_float(dct['wspd'][units])
+        fcast.precip_chance = self._read_float(dct['pop'])
+        fcast.pct_humidity = self._read_float(dct['humidity'])
 
         return fcast
 
@@ -139,17 +138,18 @@ class Weather:
         :return: a Forecast
         """
         f = Forecast()
-        f.humidity = round(random.normalvariate(55, 20))
-        f.temp_f = f.feels_like_f = round(random.normalvariate(55, 20))
+        f.pct_humidity = round(random.normalvariate(55, 20))
+        f.temp_f = f.feels_like = round(random.normalvariate(55, 20))
         f.tod = random.randrange(5, 21)
         pchance = random.randrange(0, 100, step=10)
         f.precip_chance = 0 if pchance < 20 else (100 if pchance > 80 else pchance)
         f.wind_speed = min(0, round(random.normalvariate(8, 8)))
         f.wind_dir = random.choice(list(WIND_DIRECTION.keys()))
-        f.condition_human = random.choice(WEATHER_CONDITIONS)
+        f.condition = random.choice(WEATHER_CONDITIONS)
         return f
 
-    def _build_forecasts(self, dct, location=''):
+    @staticmethod
+    def _build_forecasts(dct, location=''):
         forecasts = {}
         if FORECAST_KEY in dct:
             for f in dct[FORECAST_KEY]:
@@ -245,3 +245,8 @@ WEATHER_CONDITIONS = ['Clear', 'Heavy Fog', 'Heavy Fog Patches', 'Heavy Freezing
                       'Light Drizzel', 'Mostly Cloudy', 'Overcast', 'Partial Fog', 'Partly Cloudy', 'Patches of Fog',
                       'Scattered Clouds',
                       'Shallow Fog', 'Small Hail', 'Squalls', 'Unknown', 'Unknown Precipitation']
+
+WIND_DIRECTION = {'N': 'North', 'NNE': 'North-Northeast', 'NNW': 'North-Northwest',
+                      'ENE': 'East-Northeast', 'WNW': 'West-Northwest', 'E': 'East', 'W': 'West',
+                      'S': 'South', 'SSE': 'South-Southeast', 'SSW': 'South-Southwest',
+                      'ESE': 'East-Southeast', 'WSW': 'West-Southwest'}

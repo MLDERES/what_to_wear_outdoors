@@ -1,10 +1,14 @@
 """Console script for what_to_wear_outdoors."""
-import datetime as dt
 import sys
 import re
 import click
 import logging
 import textwrap
+import datetime as dt
+
+from numpy.random import random
+
+NOW = dt.datetime.now()
 
 from what_to_wear_outdoors import utility
 from what_to_wear_outdoors.outfit_predictors import RunningOutfitPredictor, RunningOutfitTranslator
@@ -41,7 +45,6 @@ Colors = {'Title': 'blue', 'Description': 'cyan', 'Prompt': 'yellow', 'Error': '
 days_of_the_week = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 valid_dow_value = ['today', 'tomorrow'] + days_of_the_week
 
-NOW = dt.datetime.now()
 TITLE = f'#{"-" * 18} What to Wear Outdoors {"-" * 18}#'
 
 
@@ -125,7 +128,7 @@ def auto_mode(dow, hour, location):
     fct = w.get_forecast(forecast_dt, location)
     print(fct)
     rop = RunningOutfitPredictor()
-    conditions = dict(feels_like=fct.feels_like_f, wind_speed=fct.wind_speed, pct_humidity=fct.humidity,
+    conditions = dict(feels_like=fct.feels_like, wind_speed=fct.wind_speed, pct_humidity=fct.humidity,
                       duration=45, is_light=True)
     rop = rop.predict_outfit(**conditions)
     rot = RunningOutfitTranslator()
@@ -146,6 +149,8 @@ def data_generation_mode():
     athlete_name = click.prompt(_prompt("Name"), default='Michael')
     activity_name = click.prompt(_prompt("Activity"), default='Run', type=click.Choice(['Run', 'Roadbike', 'MTB']))
 
+    # TODO: Handle mulitple sports for data generation
+    outfit_predictor = RunningOutfitPredictor()
     while 1:
         # Generate random weather
         fct = Weather.random_forecast()
@@ -155,7 +160,10 @@ def data_generation_mode():
         do_fct = click.prompt(_prompt('Do you want to do this one?'), default='y', type=click.Choice(['y', 'n', 'f']))
         if do_fct == 'f': break
         if do_fct == 'n': continue
-        print(gather_data_for_forecast(fct))
+        outfit = gather_data_for_forecast()
+        duration = min(20, random.normvariate(45, 45))
+        outfit_predictor.add_to_sample_data(athlete_name=athlete_name, forecast=fct, outfit=outfit, duration= duration)
+
 
 def gather_data_for_forecast(fct):
     """
@@ -202,7 +210,7 @@ def main():
     fct = w.get_forecast(forecast_dt, activity_location)
     print(fct)
     rop = RunningOutfitPredictor()
-    conditions = dict(feels_like=fct.feels_like_f, wind_speed=fct.wind_speed, pct_humidity=fct.humidity,
+    conditions = dict(feels_like=fct.feels_like, wind_speed=fct.wind_speed, pct_humidity=fct.humidity,
                       duration=activity_duration, is_light=True)
 
     rop.predict_outfit(**conditions)

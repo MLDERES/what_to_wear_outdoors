@@ -2,6 +2,7 @@ from unittest import TestCase
 
 from nose.tools import ok_
 
+from what_to_wear_outdoors import FctKeys
 from what_to_wear_outdoors.outfit_predictors import RunningOutfitTranslator, OutfitComponent, \
     RunningOutfitPredictor, BaseOutfitTranslator
 
@@ -36,13 +37,20 @@ class TestBaseOutfitTranslator(TestCase):
 
     def test__get_condition_phrase_temp(self):
         bot = BaseOutfitTranslator()
-        reply = bot._get_condition_phrase('feels_like', 40)
+        reply = bot._get_condition_phrase(FctKeys.FEEL_TEMP, 40)
         ok_(reply, "cool")
 
     def test__get_condition_phrase_wind_speed(self):
-        bot = BaseOutfitTranslator()
-        reply = bot._get_condition_phrase('wind_speed', 40)
+        rot = RunningOutfitTranslator()
+        reply = rot._get_condition_phrase(FctKeys.WIND_SPEED, 40)
         ok_(reply, "very windy")
+
+    def test__get_condition_phrase_wind_speed_dir(self):
+        rot = RunningOutfitTranslator()
+        reply = rot._get_condition_phrase(FctKeys.WIND_SPEED, 40, {FctKeys.WIND_DIR:'N'})
+        ok_(reply, 'very windy, 40 miles per hour from the North')
+
+
 
     def test_build_reply_from_running_predictor(self):
         """ Build a reply from the running outfit predictor, with a known condition
@@ -51,7 +59,8 @@ class TestBaseOutfitTranslator(TestCase):
         """
         rop = RunningOutfitPredictor()
         rot = RunningOutfitTranslator()
-        rop.predict_outfit(**{'feels_like': 52, 'wind_speed': 0, 'pct_humidity': .82, 'duration': 50,
+        rop.predict_outfit(**{FctKeys.FEEL_TEMP: 52, FctKeys.WIND_SPEED: 0,
+                              FctKeys.HUMIDITY: .82, 'duration': 50,
                               'is_light': False}),
         print(f'{rot.build_reply(rop.outfit_, {"feels_like":52})}')
 
