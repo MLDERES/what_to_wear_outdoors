@@ -155,8 +155,11 @@ def data_generation_mode():
         do_fct = click.prompt(_prompt('Do you want to do this one?'), default='y', type=click.Choice(['y', 'n', 'f']))
         if do_fct == 'f': break
         if do_fct == 'n': continue
+        light_condition = click.prompt(_prompt('Would there be light?'), default='y', type=click.Choice(['y', 'n']))
         outfit = gather_data_for_forecast()
-        outfit_predictor.add_to_sample_data(athlete_name=athlete_name, forecast=fct, outfit=outfit, duration=duration)
+        fct.is_daylight = light_condition
+        outfit_predictor.add_to_sample_data(athlete_name=athlete_name, forecast=fct, outfit=outfit, duration=duration,
+                                            distance=distance, activity_date=fct.timestamp)
 
     outfit_predictor.write_sample_data()
 

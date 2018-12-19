@@ -75,7 +75,7 @@ class Forecast:
         self.mth = 1
         self.dow = calendar.MONDAY
         self.civil_time = ""
-        self.is_daylight = True
+        self.is_light = True
         self.pct_humidity = 50
         self.timestamp = dt.datetime(year=NOW.year, month=self.mth, day=self.month_day, hour=self.tod)
 

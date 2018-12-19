@@ -1,9 +1,10 @@
 from unittest import TestCase
 
+import pytest
 from dateutil.relativedelta import relativedelta
 from nose.tools import ok_
 
-from what_to_wear_outdoors.cli import parse_time, figure_out_date
+from what_to_wear_outdoors.cli import parse_time, figure_out_date, data_generation_mode
 import datetime as dt
 TODAY = dt.date.today()
 
@@ -22,3 +23,6 @@ class TestCli(TestCase):
         ok_(figure_out_date('tomorrow'), TODAY+relativedelta(days=1))
         ok_(figure_out_date('Sun'), dt.date(2018, 12, 23))
 
+    @pytest.mark.skip(reason='Needs to be run manually')
+    def test_data_generation_mode(self):
+        data_generation_mode()

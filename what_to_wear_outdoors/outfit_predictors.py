@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import List, Dict, ClassVar, Callable, Any, Union
 import pandas as pd
 import numpy as np
-from numpy.core.multiarray import ndarray
 from pandas.core.dtypes.dtypes import CategoricalDtype
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.tree import DecisionTreeClassifier
@@ -160,6 +159,7 @@ class Features:
     DURATION = 'duration'
     LIGHT = 'is_light'
     DISTANCE = 'distance'
+    DATE = 'activity_date'
 
 class BaseOutfitPredictor(BaseActivityMixin):
     """ This class provides the common methods required to predict the clothing need to go outside for a given
@@ -170,7 +170,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         
     all_features = { 'scalar': [FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY,
                                 FctKeys.PRECIP_PCT, FctKeys.REAL_TEMP, FctKeys.HEAT_IDX,
-                                Features.DURATION, Features.DISTANCE,],
+                                Features.DURATION, Features.DISTANCE, Features.DATE],
                      'categorical': [Features.LIGHT, FctKeys.WIND_DIR, FctKeys.CONDITION]}
 
     def __init__(self):
@@ -287,6 +287,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         if not self._have_sample_data:
             ReferenceError('No sample data has been created yet.')
         logger.info(f'Writting sample data to {fn}')
+        # Take out the first row that we used to format the dataset
         self._sample_data.to_csv(fn)
         return fn
 
@@ -391,7 +392,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
             assert (p.is_dir(), f"get_data_path() doesn't point to a valid directory {p}")
 
             for f in p.glob('*.csv'):
-                df.append(pd.read_csv(f),ignore_index=True)
+                df = pd.concat([df, pd.read_csv(f)], ignore_index=True)
 
     
         elif filename == "what i wore running.xlsx":
@@ -403,7 +404,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
                                     true_values=['Yes', 'yes', 'y'], false_values=['No', 'no', 'n'],
                                     dtype={'Time': datetime.time}, usecols='A:Y')
         else:
-            # Read the file with the name specficied 
+            # Read the file with the name specified
             data_file = get_data_path(filename)
             logger.debug(f'Reading data from {data_file}')
             assert (data_file.exists(), f"{data_file} doesn't point to a valid file")
@@ -438,8 +439,9 @@ class BaseOutfitPredictor(BaseActivityMixin):
         return df
 
     def get_dataframe_format(self):
-        df = self.prepare_data()
-        return df.truncate(after=0)
+        df = self.prepare_data().copy()
+        return df.truncate(after=-1)
+
 
     def load_models(self):
         """

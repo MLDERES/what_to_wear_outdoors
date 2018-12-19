@@ -111,8 +111,31 @@ class TestBaseOutfitPredictor(TestCase):
         outfit = {'outer_layer': 'Short-sleeve', 'base_layer': 'Short-sleeve', 'jacket': 'None',
                   'lower_body': 'Shorts', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
                   'heavy_socks': False, 'arm_warmers': True, 'face_cover': False}
+        duration = max(20, round(random.normalvariate(45, 45)))
+        distance = round((duration / random.triangular(8, 15, 10.5)), 2)
         d = max(20, random.normalvariate(45, 45))
-        df = rop.add_to_sample_data(f, outfit=outfit, athlete_name='Jim', duration=d)
+        df = rop.add_to_sample_data(f, outfit=outfit, athlete_name='Jim', duration=d, distance=distance)
         pprint(df.to_string())
-        df = rop.add_to_sample_data(vars(f), outfit=outfit, athlete_name='Default', duration=d)
+        df = rop.add_to_sample_data(vars(f), outfit=outfit, athlete_name='Default', duration=d, distance=distance)
         pprint(df.to_string())
+
+    def test_write_sample_data(self):
+        rop = RunningOutfitPredictor()
+        f = Weather.random_forecast()
+        outfit = {'outer_layer': 'Short-sleeve', 'base_layer': 'Short-sleeve', 'jacket': 'None',
+                  'lower_body': 'Shorts', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
+                  'heavy_socks': False, 'arm_warmers': True, 'face_cover': False}
+        duration = max(20, round(random.normalvariate(45, 45)))
+        distance = round((duration / random.triangular(8, 15, 10.5)), 2)
+        d = max(20, random.normalvariate(45, 45))
+        df = rop.add_to_sample_data(f, outfit=outfit, athlete_name='Jim', duration=d, distance=distance)
+        pprint(df.to_string())
+        df = rop.add_to_sample_data(vars(f), outfit=outfit, athlete_name='Default', duration=d, distance=distance)
+        pprint(df.to_string())
+        rop.write_sample_data()
+
+    def test_get_dataframe_format(self):
+        bop = BaseOutfitPredictor()
+        df = bop.get_dataframe_format()
+        print(df.dtypes)
+        print(df)

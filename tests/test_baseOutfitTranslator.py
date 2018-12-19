@@ -1,5 +1,6 @@
 from unittest import TestCase
 
+import pytest
 from nose.tools import ok_
 
 from what_to_wear_outdoors import FctKeys
@@ -15,7 +16,6 @@ class TestOutfitTranslator(BaseOutfitTranslator):
                                     'camel_back': OutfitComponent('running camelback'),
                                     'wind_jacket': OutfitComponent('wind jacket', 'rain jacket'),
                                     }
-
 
 class TestBaseOutfitTranslator(TestCase):
 
@@ -33,24 +33,7 @@ class TestBaseOutfitTranslator(TestCase):
         outfit = {'outer_layer': 'Long-sleeve', 'base_layer': 'None', 'jacket': 'None',
                   'lower_body': 'Shorts-calf cover', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
                   'heavy_socks': False, 'arm_warmers': False, 'face_cover': False}
-        print(f'{rot.build_reply(outfit, {"feels_like":50})}')
-
-    def test__get_condition_phrase_temp(self):
-        bot = BaseOutfitTranslator()
-        reply = bot._get_condition_phrase(FctKeys.FEEL_TEMP, 40)
-        ok_(reply, "cool")
-
-    def test__get_condition_phrase_wind_speed(self):
-        rot = RunningOutfitTranslator()
-        reply = rot._get_condition_phrase(FctKeys.WIND_SPEED, 40)
-        ok_(reply, "very windy")
-
-    def test__get_condition_phrase_wind_speed_dir(self):
-        rot = RunningOutfitTranslator()
-        reply = rot._get_condition_phrase(FctKeys.WIND_SPEED, 40, {FctKeys.WIND_DIR:'N'})
-        ok_(reply, 'very windy, 40 miles per hour from the North')
-
-
+        print(f'{rot.build_reply(outfit, {"feels_like": 50})}')
 
     def test_build_reply_from_running_predictor(self):
         """ Build a reply from the running outfit predictor, with a known condition
@@ -62,7 +45,7 @@ class TestBaseOutfitTranslator(TestCase):
         rop.predict_outfit(**{FctKeys.FEEL_TEMP: 52, FctKeys.WIND_SPEED: 0,
                               FctKeys.HUMIDITY: .82, 'duration': 50,
                               'is_light': False}),
-        print(f'{rot.build_reply(rop.outfit_, {"feels_like":52})}')
+        print(f'{rot.build_reply(rop.outfit_, {"feels_like": 52})}')
 
     def test_clothing_description(self):
         bot = BaseOutfitTranslator()
@@ -73,60 +56,6 @@ class TestBaseOutfitTranslator(TestCase):
         r = bot._build_generic_from_list(['short sleeves', 'socks', 'shoes'])
         self.assertEqual('short sleeves, socks and shoes', r)
 
-    def test__build_generic_from_list_with_none(self):
-        """
-        Test the build_generic_from_list function while inserting a None into the last item of the list
-        :return:
-        """
-        bot = BaseOutfitTranslator()
-        r = bot._build_generic_from_list(['short sleeves', 'socks', 'shoes', None])
-        self.assertEqual('short sleeves, socks and shoes', r)
-
-    def test__build_generic_from_list_with_first_none(self):
-        """
-        Test the build_generic_from_list function while inserting a None into the first item of the list
-        :return:
-        """
-        bot = BaseOutfitTranslator()
-        r = bot._build_generic_from_list([None, 'short sleeves', 'socks', 'shoes'])
-        self.assertEqual('short sleeves, socks and shoes', r)
-
-    def test__build_generic_from_list_with_mid_none(self):
-        """
-        Test the build_generic_from_list function while inserting a None into the middle of the list
-        :return:
-        """
-        bot = BaseOutfitTranslator()
-        r = bot._build_generic_from_list(['short sleeves', None, 'socks', 'shoes'])
-        self.assertEqual('short sleeves, socks and shoes', r)
-
-    def test__get_component_description_simple(self):
-        """
-        Test get_component_description by just testing a simple lookup for long-sleeve
-        :return:
-        """
-        bot = BaseOutfitTranslator()
-        # Test first the base case - ensuring that we are getting the value of the class
-        r = bot._get_component_description('Long-sleeve')
-        self.assertEqual('a long-sleeved top', r)
-
-    def test__get_component_description_heavy_socks_alt_name(self):
-        """
-        Test get_component_description with a use_alternative_name option
-        :return:
-        """
-        bot = BaseOutfitTranslator()
-        r = bot._get_component_description('heavy_socks', use_alt_name=True)
-        self.assertEqual('regular socks', r)
-
-    def test__get_component_description_subclass_simple(self):
-        """
-        Initial test of the get_component_description with subclass to ensure that it gets the parent description
-        :return:
-        """
-        tot = TestOutfitTranslator()
-        r = tot._get_component_description('Long-sleeve')
-        self.assertEqual('a long-sleeved top', r)
 
     def test__get_component_description_subclass_simple_override(self):
         """
@@ -178,3 +107,40 @@ class TestBaseOutfitTranslator(TestCase):
         r = run_ot._get_component_description('Short-sleeve')
         self.assertEqual('singlet', r)
 
+@pytest.mark.parametrize("translator,condition,value,extras,expected",
+                         [
+                             (BaseOutfitTranslator(), FctKeys.FEEL_TEMP, 40, None, 'cool'),
+                             (RunningOutfitTranslator(), FctKeys.FEEL_TEMP, 40, None, 'cool'),
+                             (RunningOutfitTranslator(), FctKeys.WIND_SPEED, 40, None, 'very windy'),
+                             (BaseOutfitTranslator(), FctKeys.WIND_SPEED, 40, None, 'very windy'),
+                             (BaseOutfitTranslator(), FctKeys.WIND_SPEED, 40, {FctKeys.WIND_DIR: 'N'},
+                              'very windy, 40 miles per hour out of the North'),
+                             (RunningOutfitTranslator(), FctKeys.WIND_SPEED, 40, {FctKeys.WIND_DIR: 'N'},
+                              'very windy, 40 miles per hour out of the North'),
+                         ])
+def test__get_condition_phrase(translator, condition, value, extras, expected):
+    tx = translator
+    reply = tx._get_condition_phrase(condition, value, extras)
+    assert reply == expected
+
+@pytest.mark.parametrize("translator", [BaseOutfitTranslator(), RunningOutfitTranslator()])
+@pytest.mark.parametrize("items",
+                         [
+                             ['short sleeves', 'socks', 'shoes', None],
+                             [None, 'short sleeves', 'socks', 'shoes'],
+                             ['short sleeves', None, 'socks', 'shoes'],
+                         ])
+def test__get_condition_phrase(translator, items):
+    tx = translator
+    assert tx._build_generic_from_list(items) == 'short sleeves, socks and shoes'
+
+@pytest.mark.parametrize("translator", [BaseOutfitTranslator(), RunningOutfitTranslator(), TestOutfitTranslator()])
+@pytest.mark.parametrize("item,expected,alt_name",
+                         [('Long-sleeve', 'a long-sleeved top', False),
+                          ('heavy_socks', 'wool or insulated socks', False),
+                          ('heavy_socks', 'regular socks', True),
+                          ]
+                         )
+def test__get_component_description(translator, item, expected, alt_name):
+    tx = translator
+    assert tx._get_component_description(item, use_alt_name=alt_name) == expected
