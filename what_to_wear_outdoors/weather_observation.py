@@ -1,13 +1,15 @@
+import calendar
 import random
-from enum import Enum
-
-from numpy.random import choice
 import requests
 import dotenv
 import os
 import re
 import logging
 import json
+import datetime as dt
+import dateutil as dtu
+
+NOW = dt.datetime.now()
 
 __all__ = ['Forecast', 'Weather']
 
@@ -60,25 +62,22 @@ class JsonDictionary(dict):
 
 class Forecast:
 
-    def __init__(self, location="", condition="", feels_like=0, heat_index_f=0, temp_f=0,
-                 wind_dir='', wind_speed=0, precip_chance=0, tod=0, month_day=1, mth=1, dow='Unknown',
-                 civil_time='00:00 AM', humidity=0, is_daylight=True):
+    def __init__(self):
         super(Forecast, self).__init__()
-        self.location = location
-        self.condition = condition
-        self.feels_like = feels_like
-        self.heat_index = heat_index_f
-        self.temp = temp_f
-        self.wind_dir = wind_dir
-        self.wind_speed = wind_speed
-        self.precip_chance = precip_chance
-        self.tod = tod
-        self.month_day = month_day
-        self.mth = mth
-        self.dow = dow
-        self.civil_time = civil_time
-        self.is_daylight = is_daylight
-        self.pct_humidity = humidity
+        self.location = ""
+        self.condition = ""
+        self.feels_like = self.heat_index = self.temp_f = 0
+        self.wind_dir = None
+        self.wind_speed = 0
+        self.precip_chance = 0
+        self.tod = 5
+        self.month_day = 1
+        self.mth = 1
+        self.dow = calendar.MONDAY
+        self.civil_time = ""
+        self.is_daylight = True
+        self.pct_humidity = 50
+        self.timestamp = dt.datetime(year=NOW.year, month=self.mth, day=self.month_day, hour=self.tod)
 
     def __str__(self):
         return f'Forecast for {self.location} ' \
@@ -107,11 +106,14 @@ class Forecast:
         units = 'english' if units != 'metric' else 'metric'
 
         time_dct = JsonDictionary(dct[FCAST_TIME_KEY])
+
         fcast.tod = time_dct.read_int(DATE_HOUR)
         fcast.mth = time_dct.read_int(DATE_MONTH)
         fcast.dow = time_dct[DAY_OF_WEEK]
         fcast.civil_time = time_dct['civil']
         fcast.month_day = time_dct.read_int(DATE_DAY)
+        fcast.timestamp = dt.datetime(year=NOW.year, month=fcast.mth, day=fcast.month_day, hour=fcast.tod)
+
         fcast.condition_code = dct['condition']  # this would be the technical description
         fcast.condition = dct['wx']  # this is the human readable condition
         fcast.feels_like = self._read_float(dct['feelslike'][units])
@@ -139,17 +141,25 @@ class Weather:
         :return: a Forecast
         """
         f = Forecast()
+        f.tod = random.randrange(5, 21)
+        f.mth = random.randrange(1, 12)
+        f.month_day = random.randrange(1, 28)
+        f.timestamp = dt.datetime(year=NOW.year, month=f.mth, day=f.month_day, hour=f.tod)
+
+        f.dow = calendar.day_name[f.timestamp.weekday()]
+        f.civil_time = f.timestamp.strftime('%I:%M %p')
+
         f.pct_humidity = round(random.normalvariate(55, 20))
         f.temp_f = f.feels_like = round(random.normalvariate(55, 20))
-        f.tod = random.randrange(5, 21)
+
         pchance = random.randrange(0, 100, step=10)
         f.precip_chance = 0 if pchance < 20 else (100 if pchance > 80 else pchance)
         # We should have a wide-range but between 0-30mph
         f.wind_speed = min(30, max(0, round(random.normalvariate(8, 8))))
         f.wind_dir = random.choice(list(WIND_DIRECTION.keys()))
         f.condition = random.choices(WEATHER_CONDITIONS,
-                                     weights=([60]*len(_high_conditions)) + ([15]*len(_med_conditions)) +
-                                     ([5]*len(_low_conditions)) + ([1]*len(_unlikely_conditions)))
+                                     weights=([60] * len(_high_conditions)) + ([15] * len(_med_conditions)) +
+                                             ([5] * len(_low_conditions)) + ([1] * len(_unlikely_conditions)))
         return f
 
     @staticmethod
@@ -228,23 +238,23 @@ class Weather:
 # Keep track of all the forecasts we have gotten by location
 _All_Forecasts_Location = JsonDictionary()
 
-_high_conditions = ['Clear',  'Overcast', 'Partial Fog', 'Partly Cloudy', 'Patches of Fog',
-                     'Scattered Clouds', 'Mostly Cloudy', 'Light Rain', ]
-_med_conditions = ['Unknown', 'Heavy Thunderstorms and Rain', 'Heavy Fog','Heavy Rain', 'Heavy Rain Showers',
-                    'Heavy Fog Patches', 'Heavy Mist', 'Heavy Rain Mist',
-                    'Heavy Thunderstorm', 'Light Thunderstorms and Rain', 'Light Fog',  'Light Fog Patches',
-                    'Light Rain Showers', 'Light Mist', 'Light Rain Mist', 'Light Thunderstorm',]
+_high_conditions = ['Clear', 'Overcast', 'Partial Fog', 'Partly Cloudy', 'Patches of Fog',
+                    'Scattered Clouds', 'Mostly Cloudy', 'Light Rain', ]
+_med_conditions = ['Unknown', 'Heavy Thunderstorms and Rain', 'Heavy Fog', 'Heavy Rain', 'Heavy Rain Showers',
+                   'Heavy Fog Patches', 'Heavy Mist', 'Heavy Rain Mist',
+                   'Heavy Thunderstorm', 'Light Thunderstorms and Rain', 'Light Fog', 'Light Fog Patches',
+                   'Light Rain Showers', 'Light Mist', 'Light Rain Mist', 'Light Thunderstorm', ]
 _low_conditions = ['Heavy Snow', 'Heavy Drizzel', 'Heavy Hail Showers', 'Heavy Haze', 'Heavy Snow Showers',
-                    'Light Snow', 'Light Drizzel', 'Light Hail Showers', 'Light Haze', 'Light Snow Showers',]
+                   'Light Snow', 'Light Drizzel', 'Light Hail Showers', 'Light Haze', 'Light Snow Showers', ]
 _unlikely_conditions = ['Heavy Freezing Drizzle', 'Heavy Freezing Fog', 'Heavy Freezing Rain', 'Heavy Hail',
-                         'Heavy Small Hail Showers', 'Heavy Snow Blowing Snow Mist',
-                         'Heavy Snow Grains', 'Heavy Thunderstorms and Snow', 'Heavy Thunderstorms with Hail',
-                         'Heavy Thunderstorms with Small Hail', 'Heavy Thunderstorms and Ice Pellets', 'Heavy Spray',
-                         'Light Freezing Drizzle', 'Light Freezing Fog', 'Light Freezing Rain', 'Light Hail',
-                         'Light Small Hail Showers', 'Light Snow Blowing Snow Mist', 'Light Snow Grains',
-                         'Light Thunderstorms and Snow', 'Light Thunderstorms with Hail',
-                         'Light Thunderstorms with Small Hail', 'Light Thunderstorms and Ice Pellets', 'Light Spray',
-                         'Shallow Fog', 'Small Hail', 'Squalls', 'Unknown Precipitation']
+                        'Heavy Small Hail Showers', 'Heavy Snow Blowing Snow Mist',
+                        'Heavy Snow Grains', 'Heavy Thunderstorms and Snow', 'Heavy Thunderstorms with Hail',
+                        'Heavy Thunderstorms with Small Hail', 'Heavy Thunderstorms and Ice Pellets', 'Heavy Spray',
+                        'Light Freezing Drizzle', 'Light Freezing Fog', 'Light Freezing Rain', 'Light Hail',
+                        'Light Small Hail Showers', 'Light Snow Blowing Snow Mist', 'Light Snow Grains',
+                        'Light Thunderstorms and Snow', 'Light Thunderstorms with Hail',
+                        'Light Thunderstorms with Small Hail', 'Light Thunderstorms and Ice Pellets', 'Light Spray',
+                        'Shallow Fog', 'Small Hail', 'Squalls', 'Unknown Precipitation']
 WEATHER_CONDITIONS = _high_conditions + _med_conditions + _low_conditions + _unlikely_conditions
 
 WIND_DIRECTION = {'N': 'North', 'NNE': 'North-Northeast', 'NNW': 'North-Northwest',

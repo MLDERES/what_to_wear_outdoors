@@ -13,11 +13,20 @@ class TestBaseOutfitPredictor(TestCase):
     def test_get_dataframe_format(self):
         rop = RunningOutfitPredictor()
         df = rop.get_dataframe_format()
-        pass
 
-    def test_prepare_data(self):
-        bop = BaseOutfitPredictor()
-        df = bop.prepare_data()
+    def test_prepare_data_from_xls(self):
+        rop = RunningOutfitPredictor()
+        df = rop.prepare_data()
+        print(f'{df.columns}')
+
+    def test_prepare_data_from_one_csv(self):
+        rop = RunningOutfitPredictor()
+        df = rop.prepare_data('outfit_data_18122036.csv')
+        print(f'{df.columns}')
+
+    def test_prepare_data_from_all_csv(self):
+        rop = RunningOutfitPredictor()
+        df = rop.prepare_data('all')
         print(f'{df.columns}')
 
     def test_predictors(self):

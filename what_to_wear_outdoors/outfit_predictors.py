@@ -170,7 +170,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         
     all_features = { 'scalar': [FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY,
                                 FctKeys.PRECIP_PCT, FctKeys.REAL_TEMP, FctKeys.HEAT_IDX,
-                                Features.DURATION, Features.DISTANCE],
+                                Features.DURATION, Features.DISTANCE,],
                      'categorical': [Features.LIGHT, FctKeys.WIND_DIR, FctKeys.CONDITION]}
 
     def __init__(self):
@@ -270,6 +270,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         fields = {x: outfit[x] for x in self.prediction_labels if x in outfit}
         fields.update({x: forecast[x] for x in self.every_feature if x in forecast})
         fields.update({x: kwargs[x] for x in self.every_feature + self.prediction_labels if x in kwargs})
+        fields.update({'Athlete':athlete_name, 'activity': self.activity_name})
         record_number = len(self._sample_data)
         for k, v in fields.items():
             self._sample_data.loc[record_number, k] = v
@@ -383,17 +384,37 @@ class BaseOutfitPredictor(BaseActivityMixin):
         Rebuild both of the models associated with this activity, the categorical and the boolean model
         :return: a DataFrame encapsulating the raw data, cleaned up from the excel file
         """
-        data_file = get_data_path(filename)
-        logger.debug(f'Reading data from {data_file}')
-        #  Import and clean data
-        full_ds = pd.read_excel(data_file, sheet_name='Activity Log2',
-                                skip_blank_lines=True,
-                                true_values=['Yes', 'yes', 'y'], false_values=['No', 'no', 'n'],
-                                dtype={'Time': datetime.time}, usecols='A:Y')
-        full_ds.dropna(how='all', inplace=True)
-        full_ds.fillna(value=False, inplace=True)
-        logger.debug(f'Data file shape: {data_file}')
-        full_ds.rename(
+        df = pd.DataFrame()
+        if filename == 'all':
+            # Read every file in the data directory that has a .csv extension
+            p = get_data_path("")
+            assert (p.is_dir(), f"get_data_path() doesn't point to a valid directory {p}")
+
+            for f in p.glob('*.csv'):
+                df.append(pd.read_csv(f),ignore_index=True)
+
+    
+        elif filename == "what i wore running.xlsx":
+            data_file = get_data_path(filename)
+            logger.debug(f'Reading data from {data_file}')
+            #  Import and clean data
+            df = pd.read_excel(data_file, sheet_name='Activity Log2',
+                                    skip_blank_lines=True,
+                                    true_values=['Yes', 'yes', 'y'], false_values=['No', 'no', 'n'],
+                                    dtype={'Time': datetime.time}, usecols='A:Y')
+        else:
+            # Read the file with the name specficied 
+            data_file = get_data_path(filename)
+            logger.debug(f'Reading data from {data_file}')
+            assert (data_file.exists(), f"{data_file} doesn't point to a valid file")
+            df = pd.read_csv(data_file)
+
+        return self._clean_dataframe(df)
+
+    def _clean_dataframe(self, df):
+        df.dropna(how='all', inplace=True)
+        df.fillna(value=False, inplace=True)
+        df.rename(
             {'Date': 'activity_date', 'Time': 'activity_hour', 'Activity': 'activity', 'Distance': Features.DISTANCE,
              'Length of activity (min)': Features.DURATION, 'Condition': FctKeys.CONDITION, 'Light': Features.LIGHT,
              'Wind': FctKeys.WIND_SPEED, 'Wind Dir': FctKeys.WIND_DIR, 'Temp': FctKeys.REAL_TEMP,
@@ -404,19 +425,17 @@ class BaseOutfitPredictor(BaseActivityMixin):
              'Heavy Socks': 'heavy_socks', },
             axis='columns', inplace=True, )
         # Now deal with the special cases
-        full_ds.drop(['Feel', 'Notes', 'Hat', 'Ears', 'activity_hour'], axis='columns', inplace=True, errors='ignore')
+        df.drop(['Feel', 'Notes', 'Hat', 'Ears', 'activity_hour'], axis='columns', inplace=True, errors='ignore')
         # Establish the categorical variables
-        full_ds['activity_month'] = full_ds['activity_date'].dt.month.astype('category')
-        full_ds['activity_length'] = pd.cut(full_ds.duration, bins=[0, 31, 61, 121, 720],
+        df['activity_length'] = pd.cut(df.duration, bins=[0, 31, 61, 121, 720],
                                             labels=['short', 'medium', 'long', 'extra long'])
-        full_ds['lower_body'] = \
-            full_ds['lower_body'].astype(CategoricalDtype(categories=self._leg_categories, ordered=True))
-        full_ds['outer_layer'] = \
-            full_ds['outer_layer'].astype(CategoricalDtype(categories=self._layer_categories, ordered=True))
-        full_ds['base_layer'] = \
-            full_ds['base_layer'].astype(CategoricalDtype(categories=self._layer_categories, ordered=True))
-
-        return full_ds
+        df['lower_body'] = \
+            df['lower_body'].astype(CategoricalDtype(categories=self._leg_categories, ordered=True))
+        df['outer_layer'] = \
+            df['outer_layer'].astype(CategoricalDtype(categories=self._layer_categories, ordered=True))
+        df['base_layer'] = \
+            df['base_layer'].astype(CategoricalDtype(categories=self._layer_categories, ordered=True))
+        return df
 
     def get_dataframe_format(self):
         df = self.prepare_data()

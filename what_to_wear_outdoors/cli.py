@@ -1,13 +1,17 @@
 """Console script for what_to_wear_outdoors."""
 import random
 import sys
-import re
 import click
 import logging
 import textwrap
 import datetime as dt
 
+from dateutil.relativedelta import relativedelta
+from dateutil import parser
+import calendar
+
 NOW = dt.datetime.now()
+TODAY = dt.date.today()
 
 from what_to_wear_outdoors import utility
 from what_to_wear_outdoors.outfit_predictors import RunningOutfitPredictor, RunningOutfitTranslator, Features
@@ -41,35 +45,22 @@ Here's what I want the interface to look like -
 Colors = {'Title': 'blue', 'Description': 'cyan', 'Prompt': 'yellow', 'Error': 'red', 'Output': 'green',
           'Alternate_Output': 'cyan'}
 
-days_of_the_week = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
-valid_dow_value = ['today', 'tomorrow'] + days_of_the_week
+valid_dow_value = ['today', 'tomorrow'] + list(calendar.day_abbr)
 
 TITLE = f'#{"-" * 18} What to Wear Outdoors {"-" * 18}#'
 
 
 def parse_time(time_string):
-    m = re.search(r'([0-2]{0,1}[0-9]{0,1})(:{0,1})([0-5][0-9]){0,1}\s*([AaPp][mM]){0,1}', time_string)
-    # This should match 2300, 23:00, 1:00pm, 1:00PM, 1pm, etc.
-    # Group 1 is the hour, Group 4 is AM/PM if necessary
-    hour = NOW.hour
-    if m is not None:
-        hour = int(m.group(1))
-        if m.group(4) is not None and m.group(4).lower() == 'pm':
-            hour += 12
-    return hour
+    return parser.parse(time_string).hour
 
 
 def figure_out_date(weekday):
     if weekday == 'today':
         return NOW
     if weekday == 'tomorrow':
-        return NOW + dt.timedelta(days=1)
-    dow_target = days_of_the_week.index(weekday.lower()[:3])
-    dow_today = dt.datetime.weekday(NOW)
-    days_ahead = dow_target - dow_today
-    if (dow_target < dow_today):
-        days_ahead = + 7
-    return dt.datetime.today() + dt.timedelta(days=days_ahead)
+        return NOW + relativedelta(days=+1)
+
+    return TODAY+relativedelta(weekday=list(calendar.day_abbr).index(weekday))
 
 
 @click.group()
@@ -158,7 +149,8 @@ def data_generation_mode():
         # Display to the user
         print(fct)
         duration = max(20, round(random.normalvariate(45, 45)))
-        print(f'Duration: {duration}\n')
+        distance = round((duration/random.triangular(8,15,10.5)),2)
+        print(f'Duration: {duration} min, Distance: {distance} miles (pace = {round(duration/distance,2)})\n')
         # Ask what they would wear for each component of the outfit
         do_fct = click.prompt(_prompt('Do you want to do this one?'), default='y', type=click.Choice(['y', 'n', 'f']))
         if do_fct == 'f': break
