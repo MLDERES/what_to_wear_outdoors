@@ -1,11 +1,11 @@
 import os
 import random
 from pathlib import Path
+from pprint import pprint
 from unittest import TestCase
-from sklearn.multioutput import MultiOutputClassifier
 
 from what_to_wear_outdoors import utility, Weather, FctKeys
-from what_to_wear_outdoors.outfit_predictors import BaseOutfitPredictor, RunningOutfitPredictor
+from what_to_wear_outdoors.outfit_predictors import BaseOutfitPredictor, RunningOutfitPredictor, Features
 
 
 class TestBaseOutfitPredictor(TestCase):
@@ -23,7 +23,8 @@ class TestBaseOutfitPredictor(TestCase):
     def test_predictors(self):
         bop = BaseOutfitPredictor()
         p = bop.features
-        self.assertListEqual([FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY, 'duration', 'is_light'], p)
+        self.assertListEqual(
+            [FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY, Features.DURATION, Features.LIGHT], p)
 
     def test_rebuild_models(self):
         """
@@ -47,8 +48,9 @@ class TestBaseOutfitPredictor(TestCase):
         """
         rop = RunningOutfitPredictor()
         self.assertDictEqual(
-            rop.predict_outfit(**{'feels_like': 50, 'wind_speed': 5, 'pct_humidity': .80, 'duration': 30,
-                                  'is_light': True}),
+            rop.predict_outfit(
+                **{FctKeys.FEEL_TEMP: 50, FctKeys.WIND_SPEED: 5, FctKeys.HUMIDITY: .80, Features.DURATION: 30,
+                   Features.LIGHT: True}),
             {'outer_layer': 'Long-sleeve', 'base_layer': 'None', 'jacket': 'None',
              'lower_body': 'Shorts', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
              'heavy_socks': True, 'arm_warmers': False, 'face_cover': False})
@@ -60,8 +62,8 @@ class TestBaseOutfitPredictor(TestCase):
         """
         rop = RunningOutfitPredictor()
         self.assertDictEqual(
-            rop.predict_outfit(**{'feels_like': 52, 'wind_speed': 0, 'pct_humidity': .82, 'duration': 50,
-                                  'is_light': False}),
+            rop.predict_outfit(**{FctKeys.FEEL_TEMP: 52, FctKeys.WIND_SPEED: 0, FctKeys.HUMIDITY: .82,
+                                  Features.DURATION: 50, Features.LIGHT: False}),
             {'outer_layer': 'Long-sleeve', 'base_layer': 'None', 'jacket': 'None',
              'lower_body': 'Shorts-calf cover', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
              'heavy_socks': False, 'arm_warmers': False, 'face_cover': False})
@@ -73,8 +75,9 @@ class TestBaseOutfitPredictor(TestCase):
         """
         rop = RunningOutfitPredictor()
         self.assertDictEqual(
-            rop.predict_outfit(**{'feels_like': 61, 'wind_speed': 0, 'pct_humidity': .42, 'duration': 31,
-                                  'is_light': True}),
+            rop.predict_outfit(
+                **{FctKeys.FEEL_TEMP: 61, FctKeys.WIND_SPEED: 0, FctKeys.HUMIDITY: .42, Features.DURATION: 31,
+                   Features.LIGHT: True}),
             {'outer_layer': 'Long-sleeve', 'base_layer': 'None', 'jacket': 'None',
              'lower_body': 'Shorts', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
              'heavy_socks': True, 'arm_warmers': False, 'face_cover': False})
@@ -86,8 +89,9 @@ class TestBaseOutfitPredictor(TestCase):
         """
         rop = RunningOutfitPredictor()
         self.assertDictEqual(
-            rop.predict_outfit(**{'feels_like': 72, 'wind_speed': 9, 'pct_humidity': .38, 'duration': 55,
-                                  'is_light': True}),
+            rop.predict_outfit(
+                **{FctKeys.FEEL_TEMP: 72, FctKeys.WIND_SPEED: 9, FctKeys.HUMIDITY: .38, Features.DURATION: 55,
+                   Features.LIGHT: True}),
             {'outer_layer': 'Short-sleeve', 'base_layer': 'Short-sleeve', 'jacket': 'None',
              'lower_body': 'Shorts', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
              'heavy_socks': False, 'arm_warmers': False, 'face_cover': False})
@@ -96,11 +100,10 @@ class TestBaseOutfitPredictor(TestCase):
         rop = RunningOutfitPredictor()
         f = Weather.random_forecast()
         outfit = {'outer_layer': 'Short-sleeve', 'base_layer': 'Short-sleeve', 'jacket': 'None',
-             'lower_body': 'Shorts', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
-             'heavy_socks': False, 'arm_warmers': False, 'face_cover': False}
-        d = min(20,random.normalvariate(45, 45))
-        df = rop.add_to_sample_data(f, outfit, duration=d)
-        print(df)
-        df = rop.add_to_sample_data(vars(f), outfit, duration=d)
-        print(df)
-
+                  'lower_body': 'Shorts', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
+                  'heavy_socks': False, 'arm_warmers': True, 'face_cover': False}
+        d = max(20, random.normalvariate(45, 45))
+        df = rop.add_to_sample_data(f, outfit=outfit, athlete_name='Jim', duration=d)
+        pprint(df.to_string())
+        df = rop.add_to_sample_data(vars(f), outfit=outfit, athlete_name='Default', duration=d)
+        pprint(df.to_string())

@@ -30,6 +30,7 @@ FORECAST_KEY = 'hourly_forecast'
 FCAST_TIME_KEY = 'FCTTIME'
 NULL_VALUE = -999
 
+
 class FctKeys:
     """
     This class provides a common set of column names to be used in dictionaries, dataframes and other places
@@ -111,12 +112,12 @@ class Forecast:
         fcast.dow = time_dct[DAY_OF_WEEK]
         fcast.civil_time = time_dct['civil']
         fcast.month_day = time_dct.read_int(DATE_DAY)
-        fcast.condition_code = dct['condition'] # this would be the technical description
-        fcast.condition = dct['wx'] # this is the human readable condition
+        fcast.condition_code = dct['condition']  # this would be the technical description
+        fcast.condition = dct['wx']  # this is the human readable condition
         fcast.feels_like = self._read_float(dct['feelslike'][units])
         fcast.heat_index_f = self._read_float(dct['heatindex'][units])
         fcast.temp_f = self._read_float(dct['temp'][units])
-        fcast.wind_dir = dct['wdir']['dir'] # but then we need the 'dir' or 'degrees' key to get it
+        fcast.wind_dir = dct['wdir']['dir']  # but then we need the 'dir' or 'degrees' key to get it
         fcast.wind_speed = self._read_float(dct['wspd'][units])
         fcast.precip_chance = self._read_float(dct['pop'])
         fcast.pct_humidity = self._read_float(dct['humidity'])
@@ -143,9 +144,12 @@ class Weather:
         f.tod = random.randrange(5, 21)
         pchance = random.randrange(0, 100, step=10)
         f.precip_chance = 0 if pchance < 20 else (100 if pchance > 80 else pchance)
-        f.wind_speed = min(0, round(random.normalvariate(8, 8)))
+        # We should have a wide-range but between 0-30mph
+        f.wind_speed = min(30, max(0, round(random.normalvariate(8, 8))))
         f.wind_dir = random.choice(list(WIND_DIRECTION.keys()))
-        f.condition = random.choice(WEATHER_CONDITIONS)
+        f.condition = random.choices(WEATHER_CONDITIONS,
+                                     weights=([60]*len(_high_conditions)) + ([15]*len(_med_conditions)) +
+                                     ([5]*len(_low_conditions)) + ([1]*len(_unlikely_conditions)))
         return f
 
     @staticmethod
@@ -223,30 +227,27 @@ class Weather:
 
 # Keep track of all the forecasts we have gotten by location
 _All_Forecasts_Location = JsonDictionary()
-WEATHER_CONDITIONS = ['Clear', 'Heavy Fog', 'Heavy Fog Patches', 'Heavy Freezing Drizzle', 'Heavy Freezing Fog',
-                      'Heavy Freezing Rain', 'Heavy Hail', 'Heavy Hail Showers', 'Heavy Haze', 'Heavy Mist',
-                      'Heavy Rain', 'Heavy Rain Mist',
-                      'Heavy Rain Showers', 'Heavy Small Hail Showers', 'Heavy Snow', 'Heavy Snow Blowing Snow Mist',
-                      'Heavy Snow Grains', 'Heavy Snow Showers',
-                      'Heavy Spray', 'Heavy Thunderstorm', 'Heavy Thunderstorms and Ice Pellets',
-                      'Heavy Thunderstorms and Rain',
-                      'Heavy Thunderstorms and Snow', 'Heavy Thunderstorms with Hail',
-                      'Heavy Thunderstorms with Small Hail', 'Heavy Drizzel',
-                      'Light Fog', 'Light Fog Patches', 'Light Freezing Drizzle', 'Light Freezing Fog',
-                      'Light Freezing Rain', 'Light Hail',
-                      'Light Hail Showers', 'Light Haze', 'Light Mist', 'Light Rain', 'Light Rain Mist',
-                      'Light Rain Showers', 'Light Sandstorm',
-                      'Light Small Hail Showers', 'Light Snow', 'Light Snow Blowing Snow Mist', 'Light Snow Grains',
-                      'Light Snow Showers',
-                      'Light Spray', 'Light Thunderstorm', 'Light Thunderstorms and Ice Pellets',
-                      'Light Thunderstorms and Rain',
-                      'Light Thunderstorms and Snow', 'Light Thunderstorms with Hail',
-                      'Light Thunderstorms with Small Hail',
-                      'Light Drizzel', 'Mostly Cloudy', 'Overcast', 'Partial Fog', 'Partly Cloudy', 'Patches of Fog',
-                      'Scattered Clouds',
-                      'Shallow Fog', 'Small Hail', 'Squalls', 'Unknown', 'Unknown Precipitation']
+
+_high_conditions = ['Clear',  'Overcast', 'Partial Fog', 'Partly Cloudy', 'Patches of Fog',
+                     'Scattered Clouds', 'Mostly Cloudy', 'Light Rain', ]
+_med_conditions = ['Unknown', 'Heavy Thunderstorms and Rain', 'Heavy Fog','Heavy Rain', 'Heavy Rain Showers',
+                    'Heavy Fog Patches', 'Heavy Mist', 'Heavy Rain Mist',
+                    'Heavy Thunderstorm', 'Light Thunderstorms and Rain', 'Light Fog',  'Light Fog Patches',
+                    'Light Rain Showers', 'Light Mist', 'Light Rain Mist', 'Light Thunderstorm',]
+_low_conditions = ['Heavy Snow', 'Heavy Drizzel', 'Heavy Hail Showers', 'Heavy Haze', 'Heavy Snow Showers',
+                    'Light Snow', 'Light Drizzel', 'Light Hail Showers', 'Light Haze', 'Light Snow Showers',]
+_unlikely_conditions = ['Heavy Freezing Drizzle', 'Heavy Freezing Fog', 'Heavy Freezing Rain', 'Heavy Hail',
+                         'Heavy Small Hail Showers', 'Heavy Snow Blowing Snow Mist',
+                         'Heavy Snow Grains', 'Heavy Thunderstorms and Snow', 'Heavy Thunderstorms with Hail',
+                         'Heavy Thunderstorms with Small Hail', 'Heavy Thunderstorms and Ice Pellets', 'Heavy Spray',
+                         'Light Freezing Drizzle', 'Light Freezing Fog', 'Light Freezing Rain', 'Light Hail',
+                         'Light Small Hail Showers', 'Light Snow Blowing Snow Mist', 'Light Snow Grains',
+                         'Light Thunderstorms and Snow', 'Light Thunderstorms with Hail',
+                         'Light Thunderstorms with Small Hail', 'Light Thunderstorms and Ice Pellets', 'Light Spray',
+                         'Shallow Fog', 'Small Hail', 'Squalls', 'Unknown Precipitation']
+WEATHER_CONDITIONS = _high_conditions + _med_conditions + _low_conditions + _unlikely_conditions
 
 WIND_DIRECTION = {'N': 'North', 'NNE': 'North-Northeast', 'NNW': 'North-Northwest',
-                      'ENE': 'East-Northeast', 'WNW': 'West-Northwest', 'E': 'East', 'W': 'West',
-                      'S': 'South', 'SSE': 'South-Southeast', 'SSW': 'South-Southwest',
-                      'ESE': 'East-Southeast', 'WSW': 'West-Southwest'}
+                  'ENE': 'East-Northeast', 'WNW': 'West-Northwest', 'E': 'East', 'W': 'West',
+                  'S': 'South', 'SSE': 'South-Southeast', 'SSW': 'South-Southwest',
+                  'ESE': 'East-Southeast', 'WSW': 'West-Southwest'}

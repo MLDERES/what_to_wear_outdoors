@@ -49,7 +49,6 @@ class OutfitComponent:
 class BaseActivityMixin:
     """ This class abstracts the categories of outfit pieces that are described by the translator and features
     """
-    _prediction_labels: ndarray
 
     # _local_outfit_descr should be overriden in sub-classes if there is a desire to modify the descriptions
     # of the outfit_components_descr.  ChainMap first looks in _local_outfit_descr for a key value then looks to the
@@ -121,14 +120,6 @@ class BaseActivityMixin:
         return 'default'
 
     @property
-    def prediction_labels(self):
-        """
-        Column names for items of clothing that are going to be predicted
-        :return:
-        """
-        return self._outfit_classes
-
-    @property
     def outfit_component_options(self):
         opt = self._categorical_targets.copy()
         for i in self._boolean_targets:
@@ -165,6 +156,10 @@ class RoadbikeOutfitMixin(BaseActivityMixin):
     def activity_name(self):
         return 'Roadbike'
 
+class Features:
+    DURATION = 'duration'
+    LIGHT = 'is_light'
+    DISTANCE = 'distance'
 
 class BaseOutfitPredictor(BaseActivityMixin):
     """ This class provides the common methods required to predict the clothing need to go outside for a given
@@ -172,15 +167,43 @@ class BaseOutfitPredictor(BaseActivityMixin):
     """
     __outfit: Dict[str, str]
 
+        
+    all_features = { 'scalar': [FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY,
+                                FctKeys.PRECIP_PCT, FctKeys.REAL_TEMP, FctKeys.HEAT_IDX,
+                                Features.DURATION, Features.DISTANCE],
+                     'categorical': [Features.LIGHT, FctKeys.WIND_DIR, FctKeys.CONDITION]}
+
     def __init__(self):
         super(BaseOutfitPredictor, self).__init__()
         # TODO: When we get good enough add in a few more categorical variables
-        self._supported_features = {'scalar': ['feels_like', 'wind_speed', 'pct_humidity', 'duration'],
-                                    'categorical': ['is_light']}
+        self._supported_features = {'scalar': [FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY,
+                                               Features.DURATION],
+                                    'categorical': [Features.LIGHT]}
         self.__outfit = {}
         self._temp_f = 0
         self._sample_data = None
+        self._have_sample_data = False
         logger.debug("Creating an instance of %s", self.__class__.__name__)
+
+    @property
+    def prediction_labels(self):
+        """
+        Column names for items of clothing that are going to be predicted
+        :return:
+        """
+        return self._outfit_classes
+
+    @property
+    def every_feature(self) -> List[str]:
+        """
+        Return every single feature that is available, even if it's not yet supported
+        :return:
+        """
+        names = []
+        for v in self.all_features.values():
+            for n in v:
+                names.append(n)
+        return names
 
     @property
     def features(self) -> List[str]:
@@ -236,6 +259,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         :param athlete_name:
         :return:
         """
+        self._have_sample_data = True
         # Check to see if we have a dataframe already
         # If there is no dataframe, then create one
         if self._sample_data is None:
@@ -244,21 +268,27 @@ class BaseOutfitPredictor(BaseActivityMixin):
         # Add the required lines to the dataframe from the supplied info
         forecast = vars(forecast) if type(forecast) is not dict else forecast
         fields = {x: outfit[x] for x in self.prediction_labels if x in outfit}
-        fields.update({x: forecast[x] for x in self.features if x in forecast})
-        fields.update({x: kwargs[x] for x in self.features + self.prediction_labels if x in kwargs})
-        self._sample_data.append(fields, ignore_index=True)
+        fields.update({x: forecast[x] for x in self.every_feature if x in forecast})
+        fields.update({x: kwargs[x] for x in self.every_feature + self.prediction_labels if x in kwargs})
+        record_number = len(self._sample_data)
+        for k, v in fields.items():
+            self._sample_data.loc[record_number, k] = v
         return self._sample_data
 
     def write_sample_data(self, filename=""):
         """
         Write the sample data to the file specified
         :param filename:
-        :return:
+        :return: the filename of the where the data was written
         """
-        fn = get_data_path(f'outfit_data_{NOW.day}{NOW.month}{NOW.hour}{NOW.minute}.csv') \
-            if filename == '' else filename
-        if self._sample_data is None:
+        default_file_name = f'outfit_data_{NOW.day}{NOW.month}{NOW.hour}{NOW.minute}.csv'
+        fn = get_data_path(default_file_name if filename == "" else filename)
+        if not self._have_sample_data:
             ReferenceError('No sample data has been created yet.')
+        logger.info(f'Writting sample data to {fn}')
+        self._sample_data.to_csv(fn)
+        return fn
+
 
     def get_models(self):
         """ Get the categorical and boolean models
@@ -364,8 +394,8 @@ class BaseOutfitPredictor(BaseActivityMixin):
         full_ds.fillna(value=False, inplace=True)
         logger.debug(f'Data file shape: {data_file}')
         full_ds.rename(
-            {'Date': 'activity_date', 'Time': 'activity_hour', 'Activity': 'activity', 'Distance': 'distance',
-             'Length of activity (min)': 'duration', 'Condition': FctKeys.CONDITION, 'Light': 'is_light',
+            {'Date': 'activity_date', 'Time': 'activity_hour', 'Activity': 'activity', 'Distance': Features.DISTANCE,
+             'Length of activity (min)': Features.DURATION, 'Condition': FctKeys.CONDITION, 'Light': Features.LIGHT,
              'Wind': FctKeys.WIND_SPEED, 'Wind Dir': FctKeys.WIND_DIR, 'Temp': FctKeys.REAL_TEMP,
              'Feels like': FctKeys.FEEL_TEMP, 'Humidity': FctKeys.HUMIDITY,
              'Hat-Ears': 'ears_hat', 'Outer Layer': 'outer_layer', 'Base Layer': 'base_layer',
@@ -390,7 +420,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
 
     def get_dataframe_format(self):
         df = self.prepare_data()
-        return df.truncate(after=-1)
+        return df.truncate(after=0)
 
     def load_models(self):
         """

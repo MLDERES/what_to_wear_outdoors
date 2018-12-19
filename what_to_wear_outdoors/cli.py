@@ -1,4 +1,5 @@
 """Console script for what_to_wear_outdoors."""
+import random
 import sys
 import re
 import click
@@ -6,17 +7,15 @@ import logging
 import textwrap
 import datetime as dt
 
-from numpy.random import random
-
 NOW = dt.datetime.now()
 
 from what_to_wear_outdoors import utility
-from what_to_wear_outdoors.outfit_predictors import RunningOutfitPredictor, RunningOutfitTranslator
+from what_to_wear_outdoors.outfit_predictors import RunningOutfitPredictor, RunningOutfitTranslator, Features
 
 if __name__ == '__main__' or __package__ == '':
     from weather_observation import Weather, Forecast
 else:
-    from .weather_observation import Weather, Forecast
+    from .weather_observation import Weather, Forecast, FctKeys
 
 # TODO: Manage Command Line Arguments
 #  (-u for update model (with Excel), (-f to ask for forecast) (-d for default config) (no flags for walk-through)
@@ -72,6 +71,7 @@ def figure_out_date(weekday):
         days_ahead = + 7
     return dt.datetime.today() + dt.timedelta(days=days_ahead)
 
+
 @click.group()
 def cli():
     pass
@@ -80,7 +80,7 @@ def cli():
 @click.command('train_models')
 # @click.argument('datapath', type=click.File(), default='data/what i wore running.xlsx')
 def train_models():
-    #TODO: Support using more than one model type to train with
+    # TODO: Support using more than one model type to train with
     rop = RunningOutfitPredictor()
     rop.rebuild_models()
 
@@ -103,7 +103,7 @@ def demo_mode(duration, windspeed, temp, humidity):
     '''
     hum_pct = humidity if humidity < 1 else humidity / 100
     click.secho(f'\nRecommendation for forecast\n\tTemp:{temp}'
-                f'\n\tWind:{windspeed}\n\tHumidity:{hum_pct*100}%\n\tActivity Duration:{duration}\n')
+                f'\n\tWind:{windspeed}\n\tHumidity:{hum_pct * 100}%\n\tActivity Duration:{duration}\n')
 
     rop = RunningOutfitPredictor()
     conditions = dict(feels_like=temp, wind_speed=windspeed, pct_humidity=humidity,
@@ -116,9 +116,9 @@ def demo_mode(duration, windspeed, temp, humidity):
 
 
 @click.command('auto')
-#@click.command('--dow')
-#@click.command('--hour')
-#@click.command('--location')
+# @click.command('--dow')
+# @click.command('--hour')
+# @click.command('--location')
 def auto_mode(dow, hour, location):
     print('got into auto_mode')
     input()
@@ -136,6 +136,7 @@ def auto_mode(dow, hour, location):
     print('\n')
     [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(reply)]
 
+
 @click.command('generate')
 def data_generation_mode():
     """
@@ -149,23 +150,26 @@ def data_generation_mode():
     athlete_name = click.prompt(_prompt("Name"), default='Michael')
     activity_name = click.prompt(_prompt("Activity"), default='Run', type=click.Choice(['Run', 'Roadbike', 'MTB']))
 
-    # TODO: Handle mulitple sports for data generation
+    # TODO: Handle multiple sports for data generation
     outfit_predictor = RunningOutfitPredictor()
     while 1:
         # Generate random weather
         fct = Weather.random_forecast()
         # Display to the user
         print(fct)
+        duration = max(20, round(random.normalvariate(45, 45)))
+        print(f'Duration: {duration}\n')
         # Ask what they would wear for each component of the outfit
         do_fct = click.prompt(_prompt('Do you want to do this one?'), default='y', type=click.Choice(['y', 'n', 'f']))
         if do_fct == 'f': break
         if do_fct == 'n': continue
         outfit = gather_data_for_forecast()
-        duration = min(20, random.normvariate(45, 45))
-        outfit_predictor.add_to_sample_data(athlete_name=athlete_name, forecast=fct, outfit=outfit, duration= duration)
+        outfit_predictor.add_to_sample_data(athlete_name=athlete_name, forecast=fct, outfit=outfit, duration=duration)
+
+    outfit_predictor.write_sample_data()
 
 
-def gather_data_for_forecast(fct):
+def gather_data_for_forecast():
     """
     Collect all outfit components for a forecast from the user
     :param fct:
@@ -174,7 +178,9 @@ def gather_data_for_forecast(fct):
     outfit = {}
     op = RunningOutfitPredictor()
     for nm, opt in op.outfit_component_options.items():
-        outfit[nm] = click.prompt(nm, type=click.Choice(opt, case_sensitive=False), default=opt[0])
+        for x, v in enumerate(opt):
+            print(f'{x}: {v}')
+        outfit[nm] = opt[click.prompt(nm, type=click.IntRange(0, len(opt)), default=0)]
     return outfit
 
 
@@ -210,8 +216,8 @@ def main():
     fct = w.get_forecast(forecast_dt, activity_location)
     print(fct)
     rop = RunningOutfitPredictor()
-    conditions = dict(feels_like=fct.feels_like, wind_speed=fct.wind_speed, pct_humidity=fct.humidity,
-                      duration=activity_duration, is_light=True)
+    conditions = {FctKeys.FEEL_TEMP: fct.feels_like, FctKeys.WIND_SPEED: fct.wind_speed,
+                  FctKeys.HUMIDITY: fct.humidity, Features.DURATION: activity_duration, Features.LIGHT: True}
 
     rop.predict_outfit(**conditions)
     rot = RunningOutfitTranslator()
@@ -235,8 +241,10 @@ def prompt_for_date_time():
                                  default=NOW.hour + 1, value_proc=parse_time)
     return activity_date.combine(activity_date.date(), dt.time(hour=activity_hour))
 
+
 def _prompt(s: str):
     return click.style(s, fg=Colors['Prompt'])
+
 
 if __name__ == "__main__":
     sys.exit(data_generation_mode())
