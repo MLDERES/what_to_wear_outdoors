@@ -1,7 +1,6 @@
 from unittest import TestCase
 
 import pytest
-from nose.tools import ok_
 
 from what_to_wear_outdoors import FctKeys
 from what_to_wear_outdoors.outfit_predictors import RunningOutfitTranslator, OutfitComponent, \

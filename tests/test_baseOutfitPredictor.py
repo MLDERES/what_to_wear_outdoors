@@ -3,31 +3,52 @@ import random
 from pathlib import Path
 from pprint import pprint
 from unittest import TestCase
+import pytest
+from pytest import mark, fixture
 
 from what_to_wear_outdoors import utility, Weather, FctKeys
 from what_to_wear_outdoors.outfit_predictors import BaseOutfitPredictor, RunningOutfitPredictor, Features
 
 
+@fixture
+def build_temp_data():
+    rop = RunningOutfitPredictor()
+    f = Weather.random_forecast()
+    outfit = {'outer_layer': 'Short-sleeve', 'base_layer': 'Short-sleeve', 'jacket': 'None',
+              'lower_body': 'Shorts', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
+              'heavy_socks': False, 'arm_warmers': True, 'face_cover': False}
+    duration = max(20, round(random.normalvariate(45, 45)))
+    distance = round((duration / random.triangular(8, 15, 10.5)), 2)
+    d = max(20, random.normalvariate(45, 45))
+    df = rop.add_to_sample_data(f, outfit=outfit, athlete_name='Jim', duration=d, distance=distance)
+    df = rop.add_to_sample_data(vars(f), outfit=outfit, athlete_name='Default', duration=d, distance=distance)
+    return rop.write_sample_data('test_outfit.csv')
+
+@fixture
+def dataframe_format():
+    rop = RunningOutfitPredictor()
+    df = rop.get_dataframe_format()
+    return df
+
+
+@mark.parametrize("predictor", [RunningOutfitPredictor()])
+@mark.parametrize("filename",
+                         [   'all',
+                             'test_outfit.csv',
+                             'what i wore running.xlsx',
+                             pytest.param('', marks=[mark.xfail]),
+                         ])
+def test_prepare_data(build_temp_data, dataframe_format, predictor, filename):
+    p = predictor
+    df = p.prepare_data(filename)
+    c = list(df.columns)
+    d = list(dataframe_format.columns)
+    assert list(c) == list(d)
+
+
+
+
 class TestBaseOutfitPredictor(TestCase):
-
-    def test_get_dataframe_format(self):
-        rop = RunningOutfitPredictor()
-        df = rop.get_dataframe_format()
-
-    def test_prepare_data_from_xls(self):
-        rop = RunningOutfitPredictor()
-        df = rop.prepare_data()
-        print(f'{df.columns}')
-
-    def test_prepare_data_from_one_csv(self):
-        rop = RunningOutfitPredictor()
-        df = rop.prepare_data('outfit_data_18122036.csv')
-        print(f'{df.columns}')
-
-    def test_prepare_data_from_all_csv(self):
-        rop = RunningOutfitPredictor()
-        df = rop.prepare_data('all')
-        print(f'{df.columns}')
 
     def test_predictors(self):
         bop = BaseOutfitPredictor()

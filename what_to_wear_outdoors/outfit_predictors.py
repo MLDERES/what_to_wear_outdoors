@@ -169,7 +169,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
 
         
     all_features = { 'scalar': [FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY,
-                                FctKeys.PRECIP_PCT, FctKeys.REAL_TEMP, FctKeys.HEAT_IDX,
+                                FctKeys.PRECIP_PCT, FctKeys.REAL_TEMP,
                                 Features.DURATION, Features.DISTANCE, Features.DATE],
                      'categorical': [Features.LIGHT, FctKeys.WIND_DIR, FctKeys.CONDITION]}
 
@@ -184,6 +184,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         self._sample_data = None
         self._have_sample_data = False
         logger.debug("Creating an instance of %s", self.__class__.__name__)
+
 
     @property
     def prediction_labels(self):
@@ -216,6 +217,15 @@ class BaseOutfitPredictor(BaseActivityMixin):
             for n in v:
                 names.append(n)
         return names
+
+    @property
+    def outfit_(self) -> dict:
+        return self.__outfit
+
+    @outfit_.getter
+    def outfit_(self) -> dict:
+        return self.__outfit
+
 
     # TODO: Handle Imperial and Metric measures (Celsius and kph wind speed)
     def predict_outfit(self, **kwargs) -> Dict[str, Union[str, bool]]:
@@ -251,47 +261,6 @@ class BaseOutfitPredictor(BaseActivityMixin):
 
         return results
 
-    def add_to_sample_data(self, forecast, outfit, athlete_name='default', **kwargs):
-        """
-        Add a row of sample data to a model file.
-        :param forecast:
-        :param outfit:
-        :param athlete_name:
-        :return:
-        """
-        self._have_sample_data = True
-        # Check to see if we have a dataframe already
-        # If there is no dataframe, then create one
-        if self._sample_data is None:
-            self._sample_data = self.get_dataframe_format()
-
-        # Add the required lines to the dataframe from the supplied info
-        forecast = vars(forecast) if type(forecast) is not dict else forecast
-        fields = {x: outfit[x] for x in self.prediction_labels if x in outfit}
-        fields.update({x: forecast[x] for x in self.every_feature if x in forecast})
-        fields.update({x: kwargs[x] for x in self.every_feature + self.prediction_labels if x in kwargs})
-        fields.update({'Athlete':athlete_name, 'activity': self.activity_name})
-        record_number = len(self._sample_data)
-        for k, v in fields.items():
-            self._sample_data.loc[record_number, k] = v
-        return self._sample_data
-
-    def write_sample_data(self, filename=""):
-        """
-        Write the sample data to the file specified
-        :param filename:
-        :return: the filename of the where the data was written
-        """
-        default_file_name = f'outfit_data_{NOW.day}{NOW.month}{NOW.hour}{NOW.minute}.csv'
-        fn = get_data_path(default_file_name if filename == "" else filename)
-        if not self._have_sample_data:
-            ReferenceError('No sample data has been created yet.')
-        logger.info(f'Writting sample data to {fn}')
-        # Take out the first row that we used to format the dataset
-        self._sample_data.to_csv(fn)
-        return fn
-
-
     def get_models(self):
         """ Get the categorical and boolean models
 
@@ -313,7 +282,8 @@ class BaseOutfitPredictor(BaseActivityMixin):
             (cat_model, bool_model) = self.rebuild_models()
         return cat_model, bool_model
 
-    def _are_models_upto_date(self, cat_model_path, raw_data_path, boolean_model_path):
+    @staticmethod
+    def _are_models_upto_date(cat_model_path, raw_data_path, boolean_model_path):
         """ Determine if the model files exist and if so, is the raw data file newer
 
         :param cat_model_path:
@@ -328,9 +298,6 @@ class BaseOutfitPredictor(BaseActivityMixin):
             cat_is_newer = os.stat(cat_model_path).st_ctime >= os.stat(raw_data_path).st_ctime
         return files_exist and bool_is_newer and cat_is_newer
 
-    @property
-    def outfit_(self) -> dict:
-        return self.__outfit
 
     def rebuild_models(self) -> (MultiOutputClassifier, MultiOutputClassifier):
         """  Read the raw data and build the models (one for categorical targets one for boolean targets)
@@ -392,6 +359,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
             assert (p.is_dir(), f"get_data_path() doesn't point to a valid directory {p}")
 
             for f in p.glob('*.csv'):
+                logger.debug(f'Reading data from {f}')
                 df = pd.concat([df, pd.read_csv(f)], ignore_index=True)
 
     
@@ -407,7 +375,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
             # Read the file with the name specified
             data_file = get_data_path(filename)
             logger.debug(f'Reading data from {data_file}')
-            assert (data_file.exists(), f"{data_file} doesn't point to a valid file")
+            assert data_file.exists(), f"{data_file} does not point to a valid file"
             df = pd.read_csv(data_file)
 
         return self._clean_dataframe(df)
@@ -442,6 +410,45 @@ class BaseOutfitPredictor(BaseActivityMixin):
         df = self.prepare_data().copy()
         return df.truncate(after=-1)
 
+    def add_to_sample_data(self, forecast, outfit, athlete_name='default', **kwargs):
+        """
+        Add a row of sample data to a model file.
+        :param forecast:
+        :param outfit:
+        :param athlete_name:
+        :return:
+        """
+        self._have_sample_data = True
+        # Check to see if we have a dataframe already
+        # If there is no dataframe, then create one
+        if self._sample_data is None:
+            self._sample_data = self.get_dataframe_format()
+
+        # Add the required lines to the dataframe from the supplied info
+        forecast = vars(forecast) if type(forecast) is not dict else forecast
+        fields = {x: outfit[x] for x in self.prediction_labels if x in outfit}
+        fields.update({x: forecast[x] for x in self.every_feature if x in forecast})
+        fields.update({x: kwargs[x] for x in self.every_feature + self.prediction_labels if x in kwargs})
+        fields.update({'Athlete':athlete_name, 'activity': self.activity_name})
+        record_number = len(self._sample_data)
+        for k, v in fields.items():
+            self._sample_data.loc[record_number, k] = v
+        return self._sample_data
+
+    def write_sample_data(self, filename=""):
+        """
+        Write the sample data to the file specified if no file specified then a random file name
+        :param filename:
+        :return: the filename of the where the data was written
+        """
+        default_file_name = f'outfit_data_{NOW.day}{NOW.month}{NOW.hour}{NOW.minute}.csv'
+        fn = get_data_path(default_file_name if filename == "" else filename)
+        if not self._have_sample_data:
+            ReferenceError('No sample data has been created yet.')
+        logger.info(f'Writting sample data to {fn}')
+        # Take out the first row that we used to format the dataset
+        self._sample_data.to_csv(fn, index=False)
+        return fn
 
     def load_models(self):
         """
@@ -455,10 +462,6 @@ class BaseOutfitPredictor(BaseActivityMixin):
             cat_model = pickle.load(cf)
             bool_model = pickle.load(bf)
         return cat_model, bool_model
-
-    @outfit_.getter
-    def outfit_(self):
-        return self.__outfit
 
 
 class RunningOutfitPredictor(BaseOutfitPredictor, RunningOutfitMixin):
