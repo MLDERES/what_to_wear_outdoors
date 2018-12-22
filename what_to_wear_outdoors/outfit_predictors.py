@@ -16,7 +16,10 @@ from abc import abstractmethod
 import datetime as dt
 from what_to_wear_outdoors.weather_observation import FctKeys, WIND_DIRECTION
 
+FALSE_VALUES = ['No', 'no', 'n', 'N']
+TRUE_VALUES = ['Yes', 'yes', 'y', 'Y']
 NOW = dt.datetime.now()
+TODAY = dt.datetime.today()
 
 if __package__ == '' or __name__ == '__main__':
     from utility import get_data_path, get_boolean_model, get_categorical_model
@@ -155,11 +158,13 @@ class RoadbikeOutfitMixin(BaseActivityMixin):
     def activity_name(self):
         return 'Roadbike'
 
+
 class Features:
     DURATION = 'duration'
     LIGHT = 'is_light'
     DISTANCE = 'distance'
     DATE = 'activity_date'
+
 
 class BaseOutfitPredictor(BaseActivityMixin):
     """ This class provides the common methods required to predict the clothing need to go outside for a given
@@ -167,11 +172,10 @@ class BaseOutfitPredictor(BaseActivityMixin):
     """
     __outfit: Dict[str, str]
 
-        
-    all_features = { 'scalar': [FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY,
-                                FctKeys.PRECIP_PCT, FctKeys.REAL_TEMP,
-                                Features.DURATION, Features.DISTANCE, Features.DATE],
-                     'categorical': [Features.LIGHT, FctKeys.WIND_DIR, FctKeys.CONDITION]}
+    all_features = {'scalar': [FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY,
+                               FctKeys.PRECIP_PCT, FctKeys.REAL_TEMP,
+                               Features.DURATION, Features.DISTANCE, Features.DATE],
+                    'categorical': [Features.LIGHT, FctKeys.WIND_DIR, FctKeys.CONDITION]}
 
     def __init__(self):
         super(BaseOutfitPredictor, self).__init__()
@@ -184,7 +188,6 @@ class BaseOutfitPredictor(BaseActivityMixin):
         self._sample_data = None
         self._have_sample_data = False
         logger.debug("Creating an instance of %s", self.__class__.__name__)
-
 
     @property
     def prediction_labels(self):
@@ -226,7 +229,6 @@ class BaseOutfitPredictor(BaseActivityMixin):
     def outfit_(self) -> dict:
         return self.__outfit
 
-
     # TODO: Handle Imperial and Metric measures (Celsius and kph wind speed)
     def predict_outfit(self, **kwargs) -> Dict[str, Union[str, bool]]:
         """ Predict the clothing options that would be appropriate for an outdoor activity.
@@ -261,6 +263,20 @@ class BaseOutfitPredictor(BaseActivityMixin):
 
         return results
 
+    def _score_models(self, df):
+        """
+        Returns the scores for both models for the given set of data
+        :param df:
+        :return:
+        """
+        cat_model, bool_model = self.get_models()
+
+        df_factors = df[self.features]
+        df_results = df[self.prediction_labels]
+
+        return cat_model.score(df_factors, df_results), bool_model.score(df_factors, df_results)
+
+
     def get_models(self):
         """ Get the categorical and boolean models
 
@@ -270,65 +286,48 @@ class BaseOutfitPredictor(BaseActivityMixin):
             ' If yes, then we can just open the models and do the predicting' \
             ' if not then we are going to have to do the heavy lifting to create new models'
             '''
-        raw_data_path = get_data_path('what i wore running.xlsx')
         boolean_model_path = get_boolean_model(sport=self.activity_name)
         cat_model_path = get_categorical_model(sport=self.activity_name)
 
-        if self._are_models_upto_date(cat_model_path, raw_data_path, boolean_model_path):
-            # We are good to go with the current models and just need to do the predicting
-            (cat_model, bool_model) = self.load_models()
-        else:
+        if self._are_models_out_of_date(cat_model_path, boolean_model_path):
             # Need to rebuild the models
             (cat_model, bool_model) = self.rebuild_models()
+        else:
+            # We are good to go with the current models and just need to do the predicting
+            (cat_model, bool_model) = self.load_models()
         return cat_model, bool_model
 
     @staticmethod
-    def _are_models_upto_date(cat_model_path, raw_data_path, boolean_model_path):
-        """ Determine if the model files exist and if so, is the raw data file newer
+    def _are_models_out_of_date(cat_model_path, boolean_model_path) -> bool:
 
-        :param cat_model_path:
-        :param raw_data_path:
-        :param boolean_model_path:
-        :return:
-        """
-        files_exist = Path.exists(cat_model_path) and Path.exists(boolean_model_path)
-        bool_is_newer = cat_is_newer = False
-        if files_exist:
-            bool_is_newer = os.stat(boolean_model_path).st_ctime >= os.stat(raw_data_path).st_ctime
-            cat_is_newer = os.stat(cat_model_path).st_ctime >= os.stat(raw_data_path).st_ctime
-        return files_exist and bool_is_newer and cat_is_newer
+        # First make sure that there are boolean models at all, if not, then they are out of date
+        if Path.exists(cat_model_path) and Path.exists(boolean_model_path):
+            cat_timestamp = os.stat(cat_model_path).st_mtime
+            bool_timestamp = os.stat(boolean_model_path).st_mtime
+            # Check every file in the data directory, if any of them are newer than the model files
+            #  then the model files are out of date
+            for f in get_data_path('.').glob('*'):
+                if os.stat(f).st_mtime > cat_timestamp or os.stat(f).st_mtime > bool_timestamp:
+                    return True
+        else:
+            return True # Models don't exist so they are out of date
+        return False
 
-
-    def rebuild_models(self) -> (MultiOutputClassifier, MultiOutputClassifier):
+    def rebuild_models(self, include_xl=True) -> (MultiOutputClassifier, MultiOutputClassifier):
         """  Read the raw data and build the models (one for categorical targets one for boolean targets)
             This function also pickles and saves the models and returns them to the caller in a tuple
-
+        :param include_xl: True - include the Excel (actual data) file into the model, set this to False if the
+                            intention is to score the models
         :return: (cat_model, bool_model)
         """
-        full_ds = self.prepare_data()
-
-        full_train_ds = full_ds[(full_ds.activity == self.activity_name)].copy()
-        # TODO: --SPORT FILTER -- Remove this when we have taken care to handle multiple athletes
-        full_train_ds.drop(['Athlete', 'activity', 'activity_date'], axis='columns', inplace=True)
-
-        # 'weather_condition', 'is_light', 'wind_speed', 'wind_dir', 'temp',
-        # 'feels_like', 'pct_humidity', 'ears_hat', 'outer_layer',
-        # 'base_layer', 'arm_warmers', 'jacket', 'gloves', 'lower_body',
-        # 'heavy_socks', 'shoe_cover', 'face_cover', 'activity_month',
-        # 'activity_length']
-        def drop_others(df, keep):
-            drop_cols = [k for k in df.columns if k not in keep]
-            df.drop(drop_cols, axis=1, inplace=True)
-
-        # Take out any columns which we haven't specified as features or labels
-        drop_others(full_train_ds, self._outfit_classes + self.features)
+        full_ds = self.ingest_data(include_xl=include_xl)
 
         # Finally, we are going to be able to establish the model.
-        train_X = full_train_ds[self.features]
+        train_X = full_ds[self.features]
 
         cat_targets = list(self._categorical_targets.keys())
-        y_class = full_train_ds[cat_targets]
-        y_bools = full_train_ds[self._boolean_targets]
+        y_class = full_ds[cat_targets]
+        y_bools = full_ds[self._boolean_targets]
 
         # https://scikit-learn.org/stable/modules/multiclass.html
         # We have to do two models, one for booleans and one for classifiers (which seems dumb)
@@ -347,43 +346,73 @@ class BaseOutfitPredictor(BaseActivityMixin):
         pickle.dump(mt_forest, open(model_file, 'wb'))
         return mt_forest, bool_forest_mo
 
-    def prepare_data(self, filename='what i wore running.xlsx'):
+    def ingest_data(self, filename='all', include_xl=True) -> pd.DataFrame:
         """
-        Rebuild both of the models associated with this activity, the categorical and the boolean model
+        Rebuilds both of the models associated with this activity, the categorical and the boolean model
+        :param include_xl: include 'what I wore running.xlsx'
+        :param filename: specify the file to use to create the model or 'all'
         :return: a DataFrame encapsulating the raw data, cleaned up from the excel file
         """
         df = pd.DataFrame()
         if filename == 'all':
             # Read every file in the data directory that has a .csv extension
             p = get_data_path("")
-            assert (p.is_dir(), f"get_data_path() doesn't point to a valid directory {p}")
 
             for f in p.glob('*.csv'):
                 logger.debug(f'Reading data from {f}')
-                df = pd.concat([df, pd.read_csv(f)], ignore_index=True)
-
-    
-        elif filename == "what i wore running.xlsx":
-            data_file = get_data_path(filename)
-            logger.debug(f'Reading data from {data_file}')
-            #  Import and clean data
-            df = pd.read_excel(data_file, sheet_name='Activity Log2',
-                                    skip_blank_lines=True,
-                                    true_values=['Yes', 'yes', 'y'], false_values=['No', 'no', 'n'],
-                                    dtype={'Time': datetime.time}, usecols='A:Y')
-        else:
+                df = pd.concat([df, pd.read_csv(f, true_values=TRUE_VALUES, false_values=FALSE_VALUES)],
+                               ignore_index=True, sort=False)
+        else :
             # Read the file with the name specified
-            data_file = get_data_path(filename)
-            logger.debug(f'Reading data from {data_file}')
-            assert data_file.exists(), f"{data_file} does not point to a valid file"
-            df = pd.read_csv(data_file)
+            if get_data_path(filename).suffix == '.xlsx':
+                df = pd.concat([df, self._read_xl(filename)])
+            else:
+                data_file = get_data_path(filename).with_suffix('.csv')
+                logger.debug(f'Reading data from {data_file}')
+                assert data_file.exists(), f"{data_file} does not point to a valid file"
+                df = pd.read_csv(data_file)
 
-        return self._clean_dataframe(df)
+        if include_xl:
+            df = pd.concat([df, self._read_xl()], ignore_index=True, sort=False)
 
-    def _clean_dataframe(self, df):
-        df.dropna(how='all', inplace=True)
         df.fillna(value=False, inplace=True)
-        df.rename(
+        df = self._fix_layers(df)
+        df = self._build_data_categories(df)
+
+        df = df[(df.activity == self.activity_name)].copy()
+        # TODO: --SPORT FILTER -- Remove this when we have taken care to handle multiple athletes
+        df.drop(['Athlete', 'activity', 'activity_date'], axis='columns', inplace=True)
+
+        # 'weather_condition', 'is_light', 'wind_speed', 'wind_dir', 'temp',
+        # 'feels_like', 'pct_humidity', 'ears_hat', 'outer_layer',
+        # 'base_layer', 'arm_warmers', 'jacket', 'gloves', 'lower_body',
+        # 'heavy_socks', 'shoe_cover', 'face_cover', 'activity_month',
+        # 'activity_length']
+        def drop_others(df2, keep):
+            drop_cols = [k for k in df2.columns if k not in keep]
+            df2.drop(drop_cols, axis=1, inplace=True)
+
+        # Take out any columns which we haven't specified as features or labels
+        drop_others(df, self._outfit_classes + self.features)
+        return df
+
+    def _read_xl(self, filename='what i wore running.xlsx', sheet_name='Activity Log2') -> pd.DataFrame:
+        """
+        Create a dataframe from an Excel sheet used to capture actual clothing choices
+        :param filename: the Excel file to use (must be in the data directory)
+        :param sheet_name: the name of the sheet to read from the Excel file
+        :return: a pandas dataframe matching the same format as the csv files that are created from input mode
+        """
+        data_file = get_data_path(filename)
+        logger.debug(f'Reading XLSX data from {data_file}')
+        #  Import and clean data
+        df_xl = pd.read_excel(data_file, sheet_name=sheet_name,
+                              skip_blank_lines=True,
+                              true_values=TRUE_VALUES, false_values=FALSE_VALUES,
+                              dtype={'Time': datetime.time}, usecols='A:Y')
+        df_xl.dropna(how='all', inplace=True)
+
+        df_xl.rename(
             {'Date': 'activity_date', 'Time': 'activity_hour', 'Activity': 'activity', 'Distance': Features.DISTANCE,
              'Length of activity (min)': Features.DURATION, 'Condition': FctKeys.CONDITION, 'Light': Features.LIGHT,
              'Wind': FctKeys.WIND_SPEED, 'Wind Dir': FctKeys.WIND_DIR, 'Temp': FctKeys.REAL_TEMP,
@@ -394,10 +423,17 @@ class BaseOutfitPredictor(BaseActivityMixin):
              'Heavy Socks': 'heavy_socks', },
             axis='columns', inplace=True, )
         # Now deal with the special cases
-        df.drop(['Feel', 'Notes', 'Hat', 'Ears', 'activity_hour'], axis='columns', inplace=True, errors='ignore')
-        # Establish the categorical variables
+        df_xl.drop(['Feel', 'Notes', 'Hat', 'Ears', 'activity_hour'], axis='columns', inplace=True, errors='ignore')
+        return df_xl
+
+    def _build_data_categories(self, df):
+        """
+        Establish the proper data types for categorical columns
+        :param df:
+        :return:
+        """
         df['activity_length'] = pd.cut(df.duration, bins=[0, 31, 61, 121, 720],
-                                            labels=['short', 'medium', 'long', 'extra long'])
+                                       labels=['short', 'medium', 'long', 'extra long'])
         df['lower_body'] = \
             df['lower_body'].astype(CategoricalDtype(categories=self._leg_categories, ordered=True))
         df['outer_layer'] = \
@@ -406,8 +442,44 @@ class BaseOutfitPredictor(BaseActivityMixin):
             df['base_layer'].astype(CategoricalDtype(categories=self._layer_categories, ordered=True))
         return df
 
+    def _fix_layers(self, df) -> pd.DataFrame:
+        """
+        Ensures that clothing are properly defined.  Simply, if you wearing a jacket then you can only have an outer
+        layer if you are also wearing a base layer.  Similarly, if you are not wearing a jacket, then you can only
+        have a base layer if you are also wearing an outer layer.
+
+
+            Jacket + Outer Layer + No Base .. becomes Jacket + base layer + No Outer layer
+            Jacket + Outer Layer + Base Layer = good
+            No Jacket + Outer Layer + No Base Layer = good
+            No Jacket + Base Layer + No Outer Layer = Outer Layer (=Base Layer) + No Base Layer
+            No Jacket + Outer Layer + Base Layer = good
+        :param df:
+        :return:
+        """
+        no_jacket = (df['jacket']=='None')
+        has_jacket = ~no_jacket
+        no_base = (df['base_layer'] == 'None')
+        has_base = ~no_base
+        no_outer = (df['outer_layer'] == 'None')
+        has_outer = ~no_outer
+        no_layer = (no_outer & no_base)
+
+        #Drop all rows where the outer layer and the base layer are both empty
+        l = (df.loc[no_layer]).shape
+        logger.info(f'dropping {l[0]} rows where no base layer and no outer_layer are identified')
+        df = df[~no_layer]
+
+        df3 = df.copy()
+
+        df3.loc[has_jacket & has_outer & no_base, ['base_layer']] =df['outer_layer']
+        df3.loc[has_jacket & has_outer & no_base, ['outer_layer']] ='None'
+        df3.loc[no_jacket & no_outer & has_base, ['outer_layer']] = df['base_layer']
+        df3.loc[no_jacket & no_outer & has_base, ['base_layer']] = 'None'
+        return df3
+
     def get_dataframe_format(self):
-        df = self.prepare_data().copy()
+        df = self.ingest_data().copy()
         return df.truncate(after=-1)
 
     def add_to_sample_data(self, forecast, outfit, athlete_name='default', **kwargs):
@@ -429,7 +501,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         fields = {x: outfit[x] for x in self.prediction_labels if x in outfit}
         fields.update({x: forecast[x] for x in self.every_feature if x in forecast})
         fields.update({x: kwargs[x] for x in self.every_feature + self.prediction_labels if x in kwargs})
-        fields.update({'Athlete':athlete_name, 'activity': self.activity_name})
+        fields.update({'Athlete': athlete_name, 'activity': self.activity_name})
         record_number = len(self._sample_data)
         for k, v in fields.items():
             self._sample_data.loc[record_number, k] = v
@@ -475,18 +547,15 @@ class BaseOutfitTranslator(BaseActivityMixin):
 
     """
     _base_statements: ClassVar[Dict[str, str]] = \
-        {'opening':
-             [f'It looks like',
-              f'Oh my,',
-              f'Well,'],
-         'weather':
-             [f'the weather should be',
-              f'Weather underground says'],
-         'clothing':
-             [f'I suggest wearing',
-              f'Based on the weather conditions, you should consider',
-              f'Looks like today would be a good day to wear',
-              f'If I were going out I''d wear'],
+        {'opening': [f'It looks like',
+                     f'Oh my,',
+                     f'Well,'],
+         'weather': [f'the weather should be',
+                     f'Weather underground says'],
+         'clothing': [f'I suggest wearing',
+                      f'Based on the weather conditions, you should consider',
+                      f'Looks like today would be a good day to wear',
+                      f'If I were going out I''d wear'],
          'closing':
              [f'Of course, you should always',
               f'It would be insane not to wear',

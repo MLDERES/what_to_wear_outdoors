@@ -3,7 +3,7 @@ from pathlib import Path
 _ROOT = Path(__file__).parent
 
 
-def get_data_path(filename) -> Path:
+def get_data_path(filename='.') -> Path:
     """ Get the full path to a file in the data directory
 
     :param filename: name of the file for which to get the full path

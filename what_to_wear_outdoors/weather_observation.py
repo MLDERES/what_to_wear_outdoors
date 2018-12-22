@@ -158,8 +158,7 @@ class Weather:
         f.wind_speed = min(30, max(0, round(random.normalvariate(8, 8))))
         f.wind_dir = random.choice(list(WIND_DIRECTION.keys()))
         f.condition = random.choices(WEATHER_CONDITIONS,
-                                     weights=([60] * len(_high_conditions)) + ([15] * len(_med_conditions)) +
-                                             ([5] * len(_low_conditions)) + ([1] * len(_unlikely_conditions)))
+                                     weights=Weather._get_random_weather_condition_weights())
         return f
 
     @staticmethod
@@ -234,12 +233,20 @@ class Weather:
             f'{Weather._build_location_query(location)}.json'
         return request
 
+    @staticmethod
+    def _get_random_weather_condition_weights():
+        return (([60] * len(_high_conditions)) +
+                ([20] * len(_med_high_conditions)) +
+                ([15] * len(_med_conditions)) +
+                ([5] * len(_low_conditions)) +
+                ([1] * len(_unlikely_conditions)))
+
 
 # Keep track of all the forecasts we have gotten by location
 _All_Forecasts_Location = JsonDictionary()
 
-_high_conditions = ['Clear', 'Overcast', 'Partial Fog', 'Partly Cloudy', 'Patches of Fog',
-                    'Scattered Clouds', 'Mostly Cloudy', 'Light Rain', ]
+_high_conditions = ['Clear', 'Overcast', 'Partly Cloudy', 'Scattered Clouds', 'Mostly Cloudy', ]
+_med_high_conditions = ['Partial Fog', 'Patches of Fog', 'Light Rain', ]
 _med_conditions = ['Unknown', 'Heavy Thunderstorms and Rain', 'Heavy Fog', 'Heavy Rain', 'Heavy Rain Showers',
                    'Heavy Fog Patches', 'Heavy Mist', 'Heavy Rain Mist',
                    'Heavy Thunderstorm', 'Light Thunderstorms and Rain', 'Light Fog', 'Light Fog Patches',
@@ -255,7 +262,7 @@ _unlikely_conditions = ['Heavy Freezing Drizzle', 'Heavy Freezing Fog', 'Heavy F
                         'Light Thunderstorms and Snow', 'Light Thunderstorms with Hail',
                         'Light Thunderstorms with Small Hail', 'Light Thunderstorms and Ice Pellets', 'Light Spray',
                         'Shallow Fog', 'Small Hail', 'Squalls', 'Unknown Precipitation']
-WEATHER_CONDITIONS = _high_conditions + _med_conditions + _low_conditions + _unlikely_conditions
+WEATHER_CONDITIONS = _high_conditions + _med_high_conditions + _med_conditions + _low_conditions + _unlikely_conditions
 
 WIND_DIRECTION = {'N': 'North', 'NNE': 'North-Northeast', 'NNW': 'North-Northwest',
                   'ENE': 'East-Northeast', 'WNW': 'West-Northwest', 'E': 'East', 'W': 'West',
