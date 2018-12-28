@@ -3,9 +3,9 @@
 pushd %~dp0
 
 REM Command file for Sphinx documentation
-
+set PYTHONPATH="C:\Users\User\Anaconda3\"
 if "%SPHINXBUILD%" == "" (
-	set SPHINXBUILD=python -msphinx
+	set SPHINXBUILD=%PYTHONPATH%python -msphinx
 )
 set SOURCEDIR=.
 set BUILDDIR=_build

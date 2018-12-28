@@ -4,15 +4,28 @@ from pathlib import Path
 from pprint import pprint
 from unittest import TestCase
 import pytest
+import logging
 from pytest import mark, fixture
 import pandas as pd
-from what_to_wear_outdoors import utility, Weather, FctKeys
-from what_to_wear_outdoors.outfit_predictors import BaseOutfitPredictor, RunningOutfitPredictor, Features
+from what_to_wear_outdoors import utility, Weather, FctKeys, Features
+from what_to_wear_outdoors.outfit_predictors import BaseOutfitPredictor, RunningOutfitPredictor
 import datetime as dt
 
 TODAY = dt.date.today()
 NOW = dt.datetime.now()
 
+# Setup logging of debug messages to go to the file debug.log and the INFO messages
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    filename='debug.log',
+                    filemode='w')
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+# create formatter and add it to the handlers
+formatter = logging.Formatter('%(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+# add the handlers to the logger
+logging.getLogger('').addHandler(ch)
 
 def temp_file_path(filename):
     _ROOT = Path(Path(__file__).anchor)
@@ -90,17 +103,6 @@ class TestBaseOutfitPredictor(TestCase):
         self.assertListEqual(
             [FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY, Features.DURATION, Features.LIGHT], p)
 
-    def test__are_models_outof_date(self):
-        rop = RunningOutfitPredictor()
-        cat_model_name = utility.get_categorical_model(sport=rop.activity_name)
-        bool_model_name = utility.get_boolean_model(sport=rop.activity_name)
-        Path.touch(utility.get_data_path('test_outfit.csv'))
-        assert rop._are_models_out_of_date(cat_model_name, bool_model_name), 'Models are correctly out of date'
-        Path.touch(cat_model_name)
-        assert rop._are_models_out_of_date(cat_model_name, bool_model_name), 'cat model is new'
-        Path.touch(bool_model_name)
-        assert rop._are_models_out_of_date(cat_model_name, bool_model_name) is False, 'both models are new'
-
     def test_rebuild_models(self):
         """
         Retrain the models
@@ -116,7 +118,6 @@ class TestBaseOutfitPredictor(TestCase):
         self.assertTrue(Path.exists(utility.get_categorical_model(sport=bop.activity_name)))
         self.assertTrue(Path.exists(utility.get_boolean_model(sport=bop.activity_name)))
         #  Now give me a prediction score
-
 
     def test_generate_predictions(self):
         rop = RunningOutfitPredictor()
@@ -146,8 +147,8 @@ class TestBaseOutfitPredictor(TestCase):
                                                  Features.DURATION: 30, Features.LIGHT: True})
         self.assertDictEqual(predicted_outfit,
                              {'outer_layer': 'Long-sleeve', 'base_layer': 'None', 'jacket': 'None',
-                              'lower_body': 'Shorts', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
-                              'heavy_socks': True, 'arm_warmers': False, 'face_cover': False})
+                              'lower_body': 'Shorts-calf cover', 'shoe_cover': 'None', 'ears_hat': False,
+                              'gloves': False, 'heavy_socks': False, 'arm_warmers': False, 'face_cover': False})
 
     def test_predict_outfit_mild_light(self):
         """
@@ -156,8 +157,8 @@ class TestBaseOutfitPredictor(TestCase):
         """
         rop = RunningOutfitPredictor()
         self.assertDictEqual(
-            rop.predict_outfit(**{FctKeys.FEEL_TEMP: 52, FctKeys.WIND_SPEED: 0, FctKeys.HUMIDITY: .82,
-                                  Features.DURATION: 50, Features.LIGHT: False}),
+            rop.predict_outfit(**{FctKeys.FEEL_TEMP: 54, FctKeys.WIND_SPEED: 15, FctKeys.HUMIDITY: .58,
+                                  Features.DURATION: 115, Features.LIGHT: False}),
             {'outer_layer': 'Long-sleeve', 'base_layer': 'None', 'jacket': 'None',
              'lower_body': 'Shorts-calf cover', 'shoe_cover': 'None', 'ears_hat': False, 'gloves': False,
              'heavy_socks': False, 'arm_warmers': False, 'face_cover': False})
@@ -225,10 +226,12 @@ class TestBaseOutfitPredictor(TestCase):
         print(df.dtypes)
         print(df)
 
-    def test__score_models(self):
+    def test_ingest_data_test_and_training(self):
         rop = RunningOutfitPredictor()
-        # Need to load up a dataset with known values
-        rop.rebuild_models(include_xl=False)
-        cat_score, bool_score = rop._score_models()
-
-
+        df1 = rop.ingest_data('training_data.csv', include_xl=False)
+        df2 = rop.ingest_data('what i wore running.xlsx', include_xl=False)
+        df1_cols = list(df1.columns)
+        df2_cols = list(df2.columns)
+        df1_cols.sort()
+        df2_cols.sort()
+        assert df1_cols == df2_cols

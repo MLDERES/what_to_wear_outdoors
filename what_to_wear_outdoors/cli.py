@@ -13,11 +13,11 @@ import calendar
 NOW = dt.datetime.now()
 TODAY = dt.date.today()
 
-from what_to_wear_outdoors import utility
-from what_to_wear_outdoors.outfit_predictors import RunningOutfitPredictor, RunningOutfitTranslator, Features
+from what_to_wear_outdoors import Features
+from what_to_wear_outdoors.outfit_predictors import RunningOutfitPredictor, RunningOutfitTranslator
 
 if __name__ == '__main__' or __package__ == '':
-    from weather_observation import Weather, Forecast
+    from weather_observation import Weather, Forecast, FctKeys
 else:
     from .weather_observation import Weather, Forecast, FctKeys
 
@@ -212,7 +212,7 @@ def main():
     print(fct)
     rop = RunningOutfitPredictor()
     conditions = {FctKeys.FEEL_TEMP: fct.feels_like, FctKeys.WIND_SPEED: fct.wind_speed,
-                  FctKeys.HUMIDITY: fct.humidity, Features.DURATION: activity_duration, Features.LIGHT: True}
+                  FctKeys.HUMIDITY: fct.pct_humidity, Features.DURATION: activity_duration, Features.LIGHT: True}
 
     rop.predict_outfit(**conditions)
     rot = RunningOutfitTranslator()
@@ -242,5 +242,4 @@ def _prompt(s: str):
 
 
 if __name__ == "__main__":
-    sys.exit(data_generation_mode())
     sys.exit(main())  # pragma: no cover
