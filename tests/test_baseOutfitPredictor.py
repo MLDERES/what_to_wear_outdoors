@@ -119,25 +119,6 @@ class TestBaseOutfitPredictor(TestCase):
         self.assertTrue(Path.exists(utility.get_boolean_model(sport=bop.activity_name)))
         #  Now give me a prediction score
 
-    def test_generate_predictions(self):
-        rop = RunningOutfitPredictor()
-        df_full = pd.DataFrame()
-        for i in range(1, 100):
-            duration = max(20, round(random.normalvariate(45, 45)))
-            distance = round((duration / random.triangular(8, 15, 10.5)), 2)
-            light_condition = random.choice([True, False])
-            fct = Weather.random_forecast()
-            fct.is_daylight = light_condition
-            conditions = dict(feels_like=fct.feels_like, wind_speed=fct.wind_speed, pct_humidity=fct.pct_humidity,
-                              duration=duration, is_light=light_condition, activity_date=fct.timestamp)
-
-            df = pd.DataFrame(vars(fct))
-            predicted_outfit = rop.predict_outfit(**conditions)
-            df_outfit = pd.DataFrame.from_records([predicted_outfit])
-            df2 = pd.concat([df, df_outfit], axis=1)
-            df_full = pd.concat([df_full, df2])
-        df_full.to_csv(temp_file_path(f'sample.{random.randrange(0, 10000)}.csv'), index=False)
-
     def test_predict_outfit_mild_no_light(self):
         """
         Testing the prediction for running outfits when it's not light out.
