@@ -1,11 +1,11 @@
 import os
-from unittest import TestCase
+import random
 
 import pytest
 from pytest import fixture, mark
-
-from what_to_wear_outdoors import model_strategies, RunningOutfitMixin, FctKeys, Features, config, \
-    RunningOutfitPredictor, get_training_data_filename
+import pandas as pd
+from what_to_wear_outdoors import model_strategies, FctKeys, Features, config, \
+    RunningOutfitPredictor, get_training_data_filename, Weather
 from what_to_wear_outdoors.model_strategies import SingleDecisionTreeStrategy, DualDecisionTreeStrategy
 
 
@@ -91,6 +91,15 @@ def test_dict_of_predictors(feature_list, categorical_targets, boolean_labels, l
     assert type(_predictors['sdt']) is SingleDecisionTreeStrategy
 
 
+@fixture
+def random_forecasts():
+    d2 = [vars(Weather.random_forecast()) for _ in range(0, 100)]
+    df = pd.DataFrame(d2)
+    df[Features.DURATION] = [max(20, round(random.normalvariate(45, 45))) for _ in range(0, 100)]
+    df[Features.DISTANCE] = round(df['duration'] / (random.triangular(8, 15, 10.5)), 2)
+    df[Features.LIGHT] = [random.choice([True, False]) for _ in range(0, 100)]
+
+
 @mark.parametrize("model_strategy,expected", [('ddt', DualDecisionTreeStrategy),
                                               pytest.param('sdt', SingleDecisionTreeStrategy, marks=pytest.mark.xfail)])
 def test_get_model_by_strategy(model_strategy, expected):
@@ -102,6 +111,11 @@ def test_get_model_by_strategy(model_strategy, expected):
     i = type(rop.get_model_by_strategy(model_strategy))
     assert i is expected
 
+
+def test_predict_outfits(random_forecasts):
+    rop = RunningOutfitPredictor()
+    model = rop.get_model_by_strategy('ddt')
+    model.predict_outfits(random_forecasts)
 
 def test_ddt_fit(ddt_strategy):
     pass  # o = ddt_strategy

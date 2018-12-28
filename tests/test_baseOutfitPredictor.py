@@ -130,6 +130,7 @@ class TestBaseOutfitPredictor(TestCase):
             fct.is_daylight = light_condition
             conditions = dict(feels_like=fct.feels_like, wind_speed=fct.wind_speed, pct_humidity=fct.pct_humidity,
                               duration=duration, is_light=light_condition, activity_date=fct.timestamp)
+
             df = pd.DataFrame(vars(fct))
             predicted_outfit = rop.predict_outfit(**conditions)
             df_outfit = pd.DataFrame.from_records([predicted_outfit])

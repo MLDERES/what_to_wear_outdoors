@@ -241,15 +241,13 @@ class BaseOutfitPredictor(BaseActivityMixin):
 
         Or more explicitly:
 
-        >>> rop = RunningOutfitPredictor()
-        >>> rop.predict_outfit("feels_like"= 69, "duration" = 45, "temp_f" = 69, "wind_dir" = "E",
+        rop.predict_outfit("feels_like"= 69, "duration" = 45, "temp_f" = 69, "wind_dir" = "E",
                                 'condition' = 'Clear', 'distance' = 4, 'activity' = 'Run',
                                 'wind_speed' = 15, 'is_light''=True,'pct_humidity'= 20)
 
         ['outer_layer':'Short-sleeve', 'base_layer':None, 'Heavy_socks':False, ...]
 
         """
-        results = None
 
         logger.debug(f'Attempting to get a model for {strategy}')
         mdl = self.get_model_by_strategy(strategy)
@@ -435,13 +433,14 @@ class BaseOutfitPredictor(BaseActivityMixin):
         :param df:
         :return:
         """
-        no_jacket = (df['jacket'] == 'None')
-        has_jacket = ~no_jacket
+
         no_base = (df['base_layer'] == 'None')
         has_base = ~no_base
         no_outer = (df['outer_layer'] == 'None')
         has_outer = ~no_outer
         no_layer = (no_outer & no_base)
+        no_jacket = (df['jacket'] == 'None')
+        has_jacket = ~no_jacket
 
         # Drop all rows where the outer layer and the base layer are both empty
         l = (df.loc[no_layer]).shape
