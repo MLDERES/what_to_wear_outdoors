@@ -42,6 +42,7 @@ setup(
             'wtw-train=what_to_wear_outdoors.cli:train_models',
             'wtw-demo=what_to_wear_outdoors.cli:demo_mode',
             'wtw-auto=what_to_wear_outdoors.cli:auto_mode',
+            'wtw-gen=what_to_wear_outdoors.cli:data_generation_mode',
         ],
     },
     install_requires=requirements,
