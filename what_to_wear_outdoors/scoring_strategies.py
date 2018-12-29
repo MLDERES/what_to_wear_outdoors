@@ -41,5 +41,6 @@ class WeightedScoringStrategy(NoWeightScoringStrategy):
         col_scores, overall_score = super().score(df_predicted, df_actual, drop_perfect_scores)
         weights_arr = pd.Series(1, col_scores.index)
         for x, w in self.weights.items():
-            weights_arr[x] = w
+            if x in weights_arr:
+                weights_arr[x] = w
         return col_scores, np.average(col_scores, weights=weights_arr)

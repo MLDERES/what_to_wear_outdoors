@@ -36,7 +36,7 @@ class IOutfitPredictorStrategy(ABC):
     def get_model_filename(self, athlete_name='default'):
         raise NotImplemented
 
-    @property
+    @abstractmethod
     def features(self) -> [str]:
         """
         The names of the parameters used to predict the outcomes (labels)
@@ -44,7 +44,7 @@ class IOutfitPredictorStrategy(ABC):
         """
         pass
 
-    @property
+    @abstractmethod
     def labels(self) -> [str]:
         """
         The names of the columns that are predicted
@@ -52,7 +52,7 @@ class IOutfitPredictorStrategy(ABC):
         """
         pass
 
-    @property
+    @abstractmethod
     def strategy_id(self):
         pass
 
@@ -266,16 +266,6 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
 
         return self._scoring_strategy.score(df_predicted=predicted, df_actual=actual,
                                             drop_perfect_scores=drop_perfect_scores)
-
-
-#        column_score = np.mean((predicted == actual), axis=0)
-#       logger.info(f'column scores for the model, {column_score}')
-#       if drop_perfect_scores:
-#           overall_score = np.mean(column_score[column_score != 1])
-#       else:
-#           overall_score = np.mean(column_score)
-#       return column_score, overall_score
-
 
 class SingleDecisionTreeStrategy(BaseOutfitStrategy):
     """
