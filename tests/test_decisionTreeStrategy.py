@@ -5,7 +5,7 @@ import pytest
 from pytest import fixture, mark
 import pandas as pd
 from what_to_wear_outdoors import model_strategies, FctKeys, Features, config, \
-    RunningOutfitPredictor, get_training_data_filename, Weather
+    RunningOutfitPredictor, get_training_data_path, Weather
 from what_to_wear_outdoors.model_strategies import SingleDecisionTreeStrategy, DualDecisionTreeStrategy
 
 
@@ -98,6 +98,7 @@ def random_forecasts():
     df[Features.DURATION] = [max(20, round(random.normalvariate(45, 45))) for _ in range(0, 100)]
     df[Features.DISTANCE] = round(df['duration'] / (random.triangular(8, 15, 10.5)), 2)
     df[Features.LIGHT] = [random.choice([True, False]) for _ in range(0, 100)]
+    return df
 
 
 @mark.parametrize("model_strategy,expected", [('ddt', DualDecisionTreeStrategy),
@@ -115,7 +116,10 @@ def test_get_model_by_strategy(model_strategy, expected):
 def test_predict_outfits(random_forecasts):
     rop = RunningOutfitPredictor()
     model = rop.get_model_by_strategy('ddt')
-    model.predict_outfits(random_forecasts)
+    rf = random_forecasts
+    df = model.predict_outfits(rf)
+    print(f'{df}')
+
 
 def test_ddt_fit(ddt_strategy):
     pass  # o = ddt_strategy
@@ -123,7 +127,7 @@ def test_ddt_fit(ddt_strategy):
 
 def test_something():
     rop = RunningOutfitPredictor()
-    tr_file = get_training_data_filename()
+    tr_file = get_training_data_path()
     df = rop.ingest_data(tr_file, include_xl=False)
 
 

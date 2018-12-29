@@ -7,3 +7,4 @@ leg_categories = ['Shorts', 'Shorts-calf cover', 'Capri', 'Long tights', 'Insula
 shoe_cover_categories = ['None', 'Toe Cover', 'Boots']
 
 training_data_filename: str = 'training_data.csv'
+test_data_filename: str = 'what i wore running.xlsx'

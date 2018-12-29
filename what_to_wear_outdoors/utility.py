@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from what_to_wear_outdoors.config import training_data_filename
+from what_to_wear_outdoors.config import training_data_filename, test_data_filename
 
 _ROOT = Path(__file__).parent
 
@@ -56,5 +56,11 @@ def get_categorical_model(sport, athlete='default') -> Path:
     return get_model_path(get_model_name(sport, 'cat', athlete))
 
 
-def get_training_data_filename(sport: str = '') -> Path:
+def get_training_data_path(sport: str = '') -> Path:
+    """ Path to the file with known good source data"""
     return get_data_path(training_data_filename)
+
+
+def get_test_data_path() -> Path:
+    """ Path to the XSLX file with good test data (not to be used for training. """
+    return get_data_path(test_data_filename)

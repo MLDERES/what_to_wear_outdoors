@@ -69,7 +69,6 @@ def cli():
 
 
 @click.command('train_models')
-# @click.argument('datapath', type=click.File(), default='data/what i wore running.xlsx')
 def train_models():
     # TODO: Support using more than one model type to train with
     rop = RunningOutfitPredictor()

@@ -7,7 +7,8 @@ import pytest
 import logging
 from pytest import mark, fixture
 import pandas as pd
-from what_to_wear_outdoors import utility, Weather, FctKeys, Features
+from what_to_wear_outdoors import utility, Weather, FctKeys, Features, get_data_path, get_test_data_path, \
+    get_training_data_path
 from what_to_wear_outdoors.outfit_predictors import BaseOutfitPredictor, RunningOutfitPredictor
 import datetime as dt
 
@@ -45,7 +46,7 @@ def build_temp_data():
     df = rop.add_to_sample_data(f, outfit=outfit, athlete_name='Jim', activity_date=NOW, duration=d, distance=distance)
     df = rop.add_to_sample_data(vars(f), outfit=outfit, athlete_name='Default', activity_date=NOW, duration=d,
                                 distance=distance)
-    return rop.write_sample_data('test_outfit.csv')
+    return rop.write_sample_data()
 
 
 @fixture
@@ -63,9 +64,9 @@ def predictor():
 @mark.parametrize("filename",
                   [
                       'all',
-                      'test_outfit.csv',
+                      get_training_data_path(),
                       pytest.param('', marks=[mark.xfail]),
-                      pytest.param('what i wore running.xlsx'),
+                      pytest.param(get_test_data_path()),
                   ],
                   )
 @mark.parametrize('include_xl', [True, False])
@@ -102,22 +103,6 @@ class TestBaseOutfitPredictor(TestCase):
         p = bop.features
         self.assertListEqual(
             [FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY, Features.DURATION, Features.LIGHT], p)
-
-    def test_rebuild_models(self):
-        """
-        Retrain the models
-        :return:
-        """
-        bop = RunningOutfitPredictor()
-        if Path.exists(utility.get_categorical_model(sport=bop.activity_name)):
-            os.remove(utility.get_categorical_model(sport=bop.activity_name))
-        if Path.exists(utility.get_boolean_model(sport=bop.activity_name)):
-            os.remove(utility.get_boolean_model(sport=bop.activity_name))
-
-        cm, bm = bop.rebuild_models()
-        self.assertTrue(Path.exists(utility.get_categorical_model(sport=bop.activity_name)))
-        self.assertTrue(Path.exists(utility.get_boolean_model(sport=bop.activity_name)))
-        #  Now give me a prediction score
 
     def test_predict_outfit_mild_no_light(self):
         """

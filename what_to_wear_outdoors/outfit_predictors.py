@@ -12,7 +12,7 @@ from abc import abstractmethod
 import datetime as dt
 from what_to_wear_outdoors import config
 from what_to_wear_outdoors.utility import get_boolean_model, get_categorical_model, get_data_path, get_model_path, \
-    get_training_data_filename
+    get_training_data_path, get_test_data_path
 
 from what_to_wear_outdoors.model_strategies import IOutfitPredictorStrategy, DualDecisionTreeStrategy, \
     SingleDecisionTreeStrategy, load_model
@@ -283,7 +283,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         assert model_type in self._predictors
         predictor = self._predictors[model_type]
         model_file = get_model_path(predictor.get_model_filename())
-        tr_file = get_training_data_filename()
+        tr_file = get_training_data_path()
         out_of_date = True
 
         if Path.exists(model_file) and Path.exists(tr_file):
@@ -373,7 +373,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         drop_others(df, self._outfit_labels + self.features)
         return df
 
-    def _read_xl(self, filename='what i wore running.xlsx', sheet_name='Activity Log2') -> pd.DataFrame:
+    def _read_xl(self, filename=get_test_data_path(), sheet_name='Activity Log2') -> pd.DataFrame:
         """
         Create a dataframe from an Excel sheet used to capture actual clothing choices
 
