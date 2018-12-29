@@ -2,6 +2,15 @@
 History
 =======
 
+1.1.0 (2018-12-29)
+------------------
+- Implemented the strategy pattern for the ML predictors
+    - This was important so that I could try to improve the machine learning models without having to deal with changing the different predictors for the sports
+- Also, I made a few changes to the way the models work.
+    - I generated about 100 random forecasts and set the proper outfits for them, this becomes the test data
+    - I'm using the XLSX file, with actual outfits that I wore as the test platform
+- Moved the scoring mechanisms for each of the models outside of the ML strategies as well so that I can play with how to determine how good the models really are.
+
 
 1.0.0 (2018-12-17)
 ------------------

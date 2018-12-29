@@ -5,7 +5,7 @@ import pytest
 from pytest import fixture, mark
 import pandas as pd
 from what_to_wear_outdoors import model_strategies, FctKeys, Features, config, \
-    RunningOutfitPredictor, get_training_data_path, Weather
+    RunningOutfitPredictor, get_training_data_path, Weather, get_test_data_path
 from what_to_wear_outdoors.model_strategies import SingleDecisionTreeStrategy, DualDecisionTreeStrategy
 
 
@@ -128,13 +128,14 @@ def test_ddt_fit(ddt_strategy):
 def test_something():
     rop = RunningOutfitPredictor()
     tr_file = get_training_data_path()
-    df = rop.ingest_data(tr_file, include_xl=False)
+    df = rop.ingest_data(tr_file)
 
 
-def test__score_models():
+@mark.parametrize('drop_known', [True, False])
+def test__score_models(drop_known):
     rop = RunningOutfitPredictor()
     # Need to load up a dataset with known values
     mdl = rop.get_model_by_strategy('ddt')
-    df = rop.ingest_data('what I wore running.xlsx', False)
-    cat_score, bool_score = mdl.score(df)
-    print(f'Category score: {cat_score}\nBoolean Score: {bool_score}\n')
+    df = rop.ingest_data(get_test_data_path())
+    col_scores, overall_score = mdl.score(df, drop_known)
+    print(f'\n\nScore (Drop 100% = {drop_known}) -- {overall_score}\nColumn Scores:\n{col_scores}')

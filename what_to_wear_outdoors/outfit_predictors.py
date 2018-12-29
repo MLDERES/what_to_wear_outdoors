@@ -6,13 +6,11 @@ from collections import ChainMap
 from pathlib import Path
 from typing import List, Dict, ClassVar, Callable, Any, Union
 import pandas as pd
-import numpy as np
 from pandas.core.dtypes.dtypes import CategoricalDtype
 from abc import abstractmethod
 import datetime as dt
 from what_to_wear_outdoors import config
-from what_to_wear_outdoors.utility import get_boolean_model, get_categorical_model, get_data_path, get_model_path, \
-    get_training_data_path, get_test_data_path
+from what_to_wear_outdoors.utility import get_data_path, get_model_path, get_training_data_path, get_test_data_path
 
 from what_to_wear_outdoors.model_strategies import IOutfitPredictorStrategy, DualDecisionTreeStrategy, \
     SingleDecisionTreeStrategy, load_model
@@ -293,7 +291,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
 
         if out_of_date:
             # Need to train a new model
-            df = self.ingest_data(tr_file, include_xl=False)
+            df = self.ingest_data(tr_file)
             predictor.fit(df)
             predictor.save_model()
         else:
@@ -303,11 +301,10 @@ class BaseOutfitPredictor(BaseActivityMixin):
         self._active_predictor = predictor
         return predictor
 
-    def ingest_data(self, filename='all', include_xl=True) -> pd.DataFrame:
+    def ingest_data(self, filename='all') -> pd.DataFrame:
         """
         Loads and prepares the data files specified.
 
-        :param include_xl: include 'what I wore running.xlsx'
         :param filename: specify the file to use to create the model or 'all' if filename extension is .xlsx, then
                          include_xl is ignored
         :return: a DataFrame encapsulating the raw data, cleaned up from the excel file
@@ -335,9 +332,6 @@ class BaseOutfitPredictor(BaseActivityMixin):
                 logger.debug(f'Reading data from {data_file}')
                 assert data_file.exists(), f"{data_file} does not point to a valid file"
                 df = pd.read_csv(data_file)
-
-        if include_xl:
-            df = pd.concat([df, self._read_xl()], ignore_index=True, sort=False)
 
         return self._data_fixup(df)
 

@@ -1,16 +1,15 @@
-import os
+import datetime as dt
+import logging
 import random
 from pathlib import Path
 from pprint import pprint
 from unittest import TestCase
-import pytest
-import logging
-from pytest import mark, fixture
 import pandas as pd
-from what_to_wear_outdoors import utility, Weather, FctKeys, Features, get_data_path, get_test_data_path, \
+import pytest
+from pytest import mark, fixture
+from what_to_wear_outdoors import Weather, FctKeys, Features, get_test_data_path, \
     get_training_data_path
 from what_to_wear_outdoors.outfit_predictors import BaseOutfitPredictor, RunningOutfitPredictor
-import datetime as dt
 
 TODAY = dt.date.today()
 NOW = dt.datetime.now()
@@ -28,6 +27,7 @@ ch.setFormatter(formatter)
 # add the handlers to the logger
 logging.getLogger('').addHandler(ch)
 
+
 def temp_file_path(filename):
     _ROOT = Path(Path(__file__).anchor)
     return _ROOT / 'temp' / filename
@@ -43,9 +43,9 @@ def build_temp_data():
     duration = max(20, round(random.normalvariate(45, 45)))
     distance = round((duration / random.triangular(8, 15, 10.5)), 2)
     d = max(20, random.normalvariate(45, 45))
-    df = rop.add_to_sample_data(f, outfit=outfit, athlete_name='Jim', activity_date=NOW, duration=d, distance=distance)
-    df = rop.add_to_sample_data(vars(f), outfit=outfit, athlete_name='Default', activity_date=NOW, duration=d,
-                                distance=distance)
+    rop.add_to_sample_data(f, outfit=outfit, athlete_name='Jim', activity_date=NOW, duration=d, distance=distance)
+    rop.add_to_sample_data(vars(f), outfit=outfit, athlete_name='Default', activity_date=NOW, duration=d,
+                           distance=distance)
     return rop.write_sample_data()
 
 
@@ -69,10 +69,9 @@ def predictor():
                       pytest.param(get_test_data_path()),
                   ],
                   )
-@mark.parametrize('include_xl', [True, False])
-def test_ingest_data(build_temp_data, dataframe_format, predictor, filename, include_xl):
+def test_ingest_data(build_temp_data, dataframe_format, predictor, filename):
     p = predictor
-    df = p.ingest_data(filename, include_xl)
+    df = p.ingest_data(filename)
     c = list(df.columns)
     d = list(dataframe_format.columns)
     c.sort()
@@ -195,8 +194,8 @@ class TestBaseOutfitPredictor(TestCase):
 
     def test_ingest_data_test_and_training(self):
         rop = RunningOutfitPredictor()
-        df1 = rop.ingest_data('training_data.csv', include_xl=False)
-        df2 = rop.ingest_data('what i wore running.xlsx', include_xl=False)
+        df1 = rop.ingest_data(get_training_data_path())
+        df2 = rop.ingest_data(get_test_data_path())
         df1_cols = list(df1.columns)
         df2_cols = list(df2.columns)
         df1_cols.sort()

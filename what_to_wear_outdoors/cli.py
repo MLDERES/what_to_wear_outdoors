@@ -5,14 +5,9 @@ import click
 import logging
 import textwrap
 import datetime as dt
-
 from dateutil.relativedelta import relativedelta
 from dateutil import parser
 import calendar
-
-NOW = dt.datetime.now()
-TODAY = dt.date.today()
-
 from what_to_wear_outdoors import Features
 from what_to_wear_outdoors.outfit_predictors import RunningOutfitPredictor, RunningOutfitTranslator
 
@@ -20,6 +15,9 @@ if __name__ == '__main__' or __package__ == '':
     from weather_observation import Weather, Forecast, FctKeys
 else:
     from .weather_observation import Weather, Forecast, FctKeys
+
+NOW = dt.datetime.now()
+TODAY = dt.date.today()
 
 # TODO: Manage Command Line Arguments
 #  (-u for update model (with Excel), (-f to ask for forecast) (-d for default config) (no flags for walk-through)
@@ -60,7 +58,7 @@ def figure_out_date(weekday):
     if weekday == 'tomorrow':
         return NOW + relativedelta(days=+1)
 
-    return TODAY+relativedelta(weekday=list(calendar.day_abbr).index(weekday))
+    return TODAY + relativedelta(weekday=list(calendar.day_abbr).index(weekday))
 
 
 @click.group()
@@ -81,8 +79,8 @@ def train_models():
 @click.option('--temp', default=75, help='forecast temperature for activity')
 @click.option('--humidity', default=50.0, help='forecast humidity')
 def demo_mode(duration, windspeed, temp, humidity):
-    '''
-    This mode is used to specfic the forecast rather than to look up a forecast and depend on the results.
+    """
+    This mode is used to specific the forecast rather than to look up a forecast and depend on the results.
 
     :type windspeed: float
     :param duration: number of minutes that the activity will last
@@ -90,7 +88,7 @@ def demo_mode(duration, windspeed, temp, humidity):
     :param temp: forecasted (feels like) temperature (F)
     :param humidity: percent humidity
     :return: None
-    '''
+    """
     hum_pct = humidity if humidity < 1 else humidity / 100
     click.secho(f'\nRecommendation for forecast\n\tTemp:{temp}'
                 f'\n\tWind:{windspeed}\n\tHumidity:{hum_pct * 100}%\n\tActivity Duration:{duration}\n')
@@ -139,6 +137,7 @@ def data_generation_mode():
                                'given a variety of weather conditions.\nLet\'s get started.\n', 60)]
     athlete_name = click.prompt(_prompt("Name"), default='Michael')
     activity_name = click.prompt(_prompt("Activity"), default='Run', type=click.Choice(['Run', 'Roadbike', 'MTB']))
+    logging.debug(activity_name)
 
     # TODO: Handle multiple sports for data generation
     outfit_predictor = RunningOutfitPredictor()
@@ -148,12 +147,14 @@ def data_generation_mode():
         # Display to the user
         print(fct)
         duration = max(20, round(random.normalvariate(45, 45)))
-        distance = round((duration/random.triangular(8,15,10.5)),2)
-        print(f'Duration: {duration} min, Distance: {distance} miles (pace = {round(duration/distance,2)})\n')
+        distance = round((duration / random.triangular(8, 15, 10.5)), 2)
+        print(f'Duration: {duration} min, Distance: {distance} miles (pace = {round(duration / distance, 2)})\n')
         # Ask what they would wear for each component of the outfit
         do_fct = click.prompt(_prompt('Do you want to do this one?'), default='y', type=click.Choice(['y', 'n', 'f']))
-        if do_fct == 'f': break
-        if do_fct == 'n': continue
+        if do_fct == 'f':
+            break
+        if do_fct == 'n':
+            continue
         light_condition = click.prompt(_prompt('Would there be light?'), default='y', type=click.Choice(['y', 'n']))
         outfit = gather_data_for_forecast()
         fct.is_daylight = light_condition
@@ -166,8 +167,7 @@ def data_generation_mode():
 def gather_data_for_forecast():
     """
     Collect all outfit components for a forecast from the user
-    :param fct:
-    :return:
+    :return: the outfit that the user tells us fits the forecast
     """
     outfit = {}
     op = RunningOutfitPredictor()
@@ -215,16 +215,16 @@ def main():
 
     rop.predict_outfit(**conditions)
     rot = RunningOutfitTranslator()
-    reply = rot.build_reply(rop.outfit_
-                            , conditions)
+    reply = rot.build_reply(rop.outfit_, conditions)
     click.secho(f'\n#{"-" * 18}ML OUTPUT{"-" * 18}#', fg=Colors['Output'])
     [click.secho(li, fg=Colors['Output']) for li in textwrap.wrap(reply)]
 
 
 def prompt_for_date_time():
-    '''  Abstract the prompt for activity date/time in case we have to ask more than once to get it right
+    """
+    Abstract the prompt for activity date/time in case we have to ask more than once to get it right
     :return: a representation of the date and time in UTC format
-    '''
+    """
     activity_date = click.prompt(
         click.style("\n\nWhat day will you be going outside?", fg=Colors['Prompt']),
         default='today', type=click.Choice(valid_dow_value))

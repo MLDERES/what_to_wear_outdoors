@@ -5,11 +5,10 @@ from pathlib import Path
 from typing import Dict, Union, Any, List, Tuple
 import numpy as np
 import pandas as pd
-from pandas.core.dtypes.dtypes import CategoricalDtype
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.tree import DecisionTreeClassifier
 import logging
-
+from what_to_wear_outdoors.scoring_strategies import NoWeightScoringStrategy, WeightedScoringStrategy
 from what_to_wear_outdoors.utility import get_model_path, get_model_name
 
 logger = logging.getLogger(__name__)
@@ -141,6 +140,7 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
     This outfit decision making strategy uses two separate models to determine an outfit.  One for boolean outfit
     components and one for categorical components.  Both models are calculated using DecisionTrees
     """
+    _scoring_strategy = NoWeightScoringStrategy()
 
     def __init__(self, activity: str, features: List[str], categorical_targets: Dict[str, List[str]],
                  boolean_labels: List[str]):
@@ -247,10 +247,10 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
 
         return results
 
-    def score(self, df, use_known_labels=False) -> (List[float], float):
+    def score(self, df, drop_perfect_scores=False) -> (Dict[str, float], float):
         """ Provide score for the model by outfit component
 
-        :param use_known_labels: If False, then don't consider the labels that are 100% accurate in the scoring.
+        :param drop_perfect_scores: If False, then don't consider the labels that are 100% accurate in the scoring.
         This keeps the model from looking better than it is if there are a few labels that aren't actually used (like
         shoe covers for running).
         :param df: Dataframe with the the known good data
@@ -262,13 +262,17 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
         predicted = self.predict_outfits(df)
         actual = df[self.categorical_labels + self.boolean_labels]
 
-        column_score = np.mean((predicted == actual), axis=0)
-        logger.info(f'column scores for the model, {column_score}')
-        if use_known_labels:
-            overall_score = np.mean(column_score)
-        else:
-            overall_score = np.mean(column_score[column_score != 1])
-        return column_score, overall_score
+        return self._scoring_strategy.score(df_predicted=predicted, df_actual=actual,
+                                            drop_perfect_scores=drop_perfect_scores)
+
+
+#        column_score = np.mean((predicted == actual), axis=0)
+#       logger.info(f'column scores for the model, {column_score}')
+#       if drop_perfect_scores:
+#           overall_score = np.mean(column_score[column_score != 1])
+#       else:
+#           overall_score = np.mean(column_score)
+#       return column_score, overall_score
 
 
 class SingleDecisionTreeStrategy(BaseOutfitStrategy):
