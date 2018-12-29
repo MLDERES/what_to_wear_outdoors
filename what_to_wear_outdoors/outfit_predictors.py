@@ -325,7 +325,6 @@ class BaseOutfitPredictor(BaseActivityMixin):
             # Read the file with the name specified
             if get_data_path(filename).suffix == '.xlsx':
                 df = pd.concat([df, self._read_xl(filename)])
-                include_xl = False
             else:
                 data_file = get_data_path(filename).with_suffix('.csv')
                 logger.debug(f'Reading data from {data_file}')
