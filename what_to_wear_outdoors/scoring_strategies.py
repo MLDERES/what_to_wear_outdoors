@@ -3,6 +3,8 @@ from typing import Dict
 import numpy as np
 import logging
 
+import pandas as pd
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,5 +39,7 @@ class WeightedScoringStrategy(NoWeightScoringStrategy):
 
     def score(self, df_predicted, df_actual, drop_perfect_scores=False) -> (Dict[str, float], float):
         col_scores, overall_score = super().score(df_predicted, df_actual, drop_perfect_scores)
-        weighted_scores = [col_scores[x] * w for x, w in self.weights.items()]
-        return col_scores, np.mean(weighted_scores)
+        weights_arr = pd.Series(1, col_scores.index)
+        for x, w in self.weights.items():
+            weights_arr[x] = w
+        return col_scores, np.average(col_scores, weights=weights_arr)

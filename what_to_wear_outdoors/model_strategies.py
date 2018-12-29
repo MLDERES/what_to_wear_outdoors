@@ -140,7 +140,9 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
     This outfit decision making strategy uses two separate models to determine an outfit.  One for boolean outfit
     components and one for categorical components.  Both models are calculated using DecisionTrees
     """
-    _scoring_strategy = NoWeightScoringStrategy()
+    # _scoring_strategy = NoWeightScoringStrategy()
+    _scoring_strategy = WeightedScoringStrategy({'outer_layer': 10, 'base_layer': 10, 'jacket': 5, 'lower_body': 10,
+                                                 'ears_hat': 5, 'gloves': 5, 'heavy_socks': 5, 'arm_warmers': 1})
 
     def __init__(self, activity: str, features: List[str], categorical_targets: Dict[str, List[str]],
                  boolean_labels: List[str]):
