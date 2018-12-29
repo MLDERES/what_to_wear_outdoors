@@ -277,7 +277,6 @@ class BaseOutfitPredictor(BaseActivityMixin):
         :return: A model that can predict the right outfit based on weather conditions.
 
         """
-
         assert model_type in self._predictors
         predictor = self._predictors[model_type]
         model_file = get_model_path(predictor.get_model_filename())

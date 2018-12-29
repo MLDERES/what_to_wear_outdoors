@@ -204,12 +204,7 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
         :return: dictionary of outfit components, keys are defined by output components
         """
 
-        if not self._is_fit or self._categorical_model is None or self._boolean_model is None:
-            err_msg = f'Attempting to predict prior to training. _is_fit:{self._is_fit} cat_model is built:' \
-                '{self._categorical_model is not None} boolean model is built: {self._boolean_model is not None}'
-            logger.error(err_msg)
-            raise NotFittedError('This model has yet to be trained. Execute the fit function with training'
-                                 'data prior to attempting to predict. ')
+        self._check_has_been_fit()
 
         # Now we need to predict using the categorical model and then the boolean model
         #  The categorical model will predict items that can be of more than one type
@@ -234,6 +229,7 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
 
         return results
 
+
     def predict_outfits(self, df: pd.DataFrame) -> pd.DataFrame:
         """ Predict multiple outfits given the dataframe of prediction factors
 
@@ -241,6 +237,7 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
         :param df:
         :return:
         """
+        self._check_has_been_fit()
         df = df[self.features]
         cat_labels = self._categorical_model.predict(df)
         bool_labels = self._boolean_model.predict(df)
@@ -266,6 +263,19 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
 
         return self._scoring_strategy.score(df_predicted=predicted, df_actual=actual,
                                             drop_perfect_scores=drop_perfect_scores)
+
+    def _check_has_been_fit(self) -> None:
+        """ Raise NotFittedError if the model has not yet been fit
+
+        :return: None
+        """
+        if not self._is_fit or self._categorical_model is None or self._boolean_model is None:
+            err_msg = f'Attempting to predict prior to training. _is_fit:{self._is_fit} cat_model is built:' \
+                '{self._categorical_model is not None} boolean model is built: {self._boolean_model is not None}'
+            logger.error(err_msg)
+            raise NotFittedError('This model has yet to be trained. Execute the fit function with training'
+                                 'data prior to attempting to predict. ')
+
 
 class SingleDecisionTreeStrategy(BaseOutfitStrategy):
     """
