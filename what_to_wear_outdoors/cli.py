@@ -14,7 +14,7 @@ from what_to_wear_outdoors.outfit_predictors import RunningOutfitPredictor, Runn
 if __name__ == '__main__' or __package__ == '':
     from weather_observation import Weather, Forecast, FctKeys
 else:
-    from .weather_observation import Weather, Forecast, FctKeys
+    from .weather_observation import Weather, Observation, FctKeys
 
 NOW = dt.datetime.now()
 TODAY = dt.date.today()
@@ -112,7 +112,7 @@ def auto_mode(dow, hour, location):
     input()
     w = Weather()
     forecast_dt = parse_time(hour)
-    logging.debug(f'Forecast (calculated): {forecast_dt}')
+    logging.debug(f'Observation (calculated): {forecast_dt}')
     fct = w.get_forecast(forecast_dt, location)
     print(fct)
     rop = RunningOutfitPredictor()
@@ -206,7 +206,7 @@ def main():
     activity_duration = click.prompt(_prompt("How long will you be out?"), default=45)
 
     w = Weather()
-    logging.debug(f'Forecast date (calculated): {forecast_dt}')
+    logging.debug(f'Observation date (calculated): {forecast_dt}')
     fct = w.get_forecast(forecast_dt, activity_location)
     print(fct)
     rop = RunningOutfitPredictor()

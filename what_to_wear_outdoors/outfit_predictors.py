@@ -10,7 +10,7 @@ from pandas.core.dtypes.dtypes import CategoricalDtype
 from abc import abstractmethod
 import datetime as dt
 from what_to_wear_outdoors import config
-from what_to_wear_outdoors.utility import get_data_path, get_model_path, get_training_data_path, get_test_data_path
+from what_to_wear_outdoors.utility import get_data_path, get_model_path, get_training_data_filepath, get_test_data_filepath
 
 from what_to_wear_outdoors.model_strategies import IOutfitPredictorStrategy, DualDecisionTreeStrategy, \
     SingleDecisionTreeStrategy, load_model
@@ -258,9 +258,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         logger.debug(f'These parameters were passed to the predict_outfit function: {kwargs}')
         predict_X = prediction_factors[mdl.features]
         logger.debug(f'Peeling off the factors from the supplied prediction parameters ({self.features})')
-
         results = mdl.predict_outfit(predict_X)
-
         logger.debug(f'All the results for the prediction: {results}')
 
         # Save the last outfit we predicted to a property for easy retrieval
@@ -275,12 +273,11 @@ class BaseOutfitPredictor(BaseActivityMixin):
         :param model_type: one of 'ddt' - DualDecisionTreeStrategy or 'sdt' - SingleDecisionTreeStrategy others maybe
         made available in the future
         :return: A model that can predict the right outfit based on weather conditions.
-
         """
         assert model_type in self._predictors
         predictor = self._predictors[model_type]
         model_file = get_model_path(predictor.get_model_filename())
-        tr_file = get_training_data_path()
+        tr_file = get_training_data_filepath()
         out_of_date = True
 
         if Path.exists(model_file) and Path.exists(tr_file):
@@ -365,7 +362,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         drop_others(df, self._outfit_labels + self.features)
         return df
 
-    def _read_xl(self, filename=get_test_data_path(), sheet_name='Activity Log2') -> pd.DataFrame:
+    def _read_xl(self, filename=get_test_data_filepath(), sheet_name='Activity Log2') -> pd.DataFrame:
         """
         Create a dataframe from an Excel sheet used to capture actual clothing choices
 

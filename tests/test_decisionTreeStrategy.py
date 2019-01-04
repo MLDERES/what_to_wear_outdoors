@@ -5,7 +5,7 @@ import pytest
 from pytest import fixture, mark
 import pandas as pd
 from what_to_wear_outdoors import model_strategies, FctKeys, Features, config, \
-    RunningOutfitPredictor, get_training_data_path, Weather, get_test_data_path
+    RunningOutfitPredictor, get_training_data_filepath, Weather, get_test_data_filepath, get_data_path
 from what_to_wear_outdoors.model_strategies import SingleDecisionTreeStrategy, DualDecisionTreeStrategy
 
 
@@ -65,6 +65,23 @@ def sdt_strategy(feature_list, label_list):
     return SingleDecisionTreeStrategy('run', feature_list, label_list)
 
 
+@fixture
+def random_forecasts():
+    d2 = [vars(Weather.random_forecast()) for _ in range(0, 100)]
+    df = pd.DataFrame(d2)
+    df[Features.DURATION] = [max(20, round(random.normalvariate(45, 45))) for _ in range(0, 100)]
+    df[Features.DISTANCE] = round(df['duration'] / (random.triangular(8, 15, 10.5)), 2)
+    df[Features.LIGHT] = [random.choice([True, False]) for _ in range(0, 100)]
+    return df
+
+
+@fixture
+def training_data():
+    data_file = get_data_path(config.training_data_filename).with_suffix('.csv')
+    assert data_file.exists(), f"{data_file} does not point to a valid file"
+    return pd.read_csv(data_file)
+
+
 def test_save_load_model_ddt(ddt_strategy):
     p = ddt_strategy.save_model('default')
     o2 = model_strategies.load_model(p, 'default', 'run')
@@ -89,16 +106,6 @@ def test_dict_of_predictors(feature_list, categorical_targets, boolean_labels, l
                                                      labels=label_list)}
     assert type(_predictors['ddt']) is DualDecisionTreeStrategy
     assert type(_predictors['sdt']) is SingleDecisionTreeStrategy
-
-
-@fixture
-def random_forecasts():
-    d2 = [vars(Weather.random_forecast()) for _ in range(0, 100)]
-    df = pd.DataFrame(d2)
-    df[Features.DURATION] = [max(20, round(random.normalvariate(45, 45))) for _ in range(0, 100)]
-    df[Features.DISTANCE] = round(df['duration'] / (random.triangular(8, 15, 10.5)), 2)
-    df[Features.LIGHT] = [random.choice([True, False]) for _ in range(0, 100)]
-    return df
 
 
 @mark.parametrize("model_strategy,expected", [('ddt', DualDecisionTreeStrategy),
@@ -127,8 +134,14 @@ def test_ddt_fit(ddt_strategy):
 
 def test_something():
     rop = RunningOutfitPredictor()
-    tr_file = get_training_data_path()
+    tr_file = get_training_data_filepath()
     df = rop.ingest_data(tr_file)
+
+
+def test__data_fixup(training_data):
+    rop = RunningOutfitPredictor()
+    df = rop._data_fixup(training_data)
+    print(f'{df.head()}')
 
 
 @mark.parametrize('drop_known', [True, False])
@@ -136,6 +149,6 @@ def test__score_models(drop_known):
     rop = RunningOutfitPredictor()
     # Need to load up a dataset with known values
     mdl = rop.get_model_by_strategy('ddt')
-    df = rop.ingest_data(get_test_data_path())
+    df = rop.ingest_data(get_test_data_filepath())
     col_scores, overall_score = mdl.score(df, drop_known)
     print(f'\n\nScore (Drop 100% = {drop_known}) -- {overall_score}\nColumn Scores:\n{col_scores}')

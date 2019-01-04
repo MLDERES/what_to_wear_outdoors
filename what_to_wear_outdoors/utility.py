@@ -14,6 +14,15 @@ def get_data_path(filename='.') -> Path:
     return _ROOT / 'data' / filename
 
 
+def get_data_test_path(filename='.') -> Path:
+    """ Get the full path to a file in the data directory
+
+    :param filename: name of the file for which to get the full path
+    :return: a Path object that points to the file passed in the filename argument
+    """
+    return _ROOT / 'data' / 'test' / filename
+
+
 def get_model_path(filename) -> Path:
     """ Get the full path to a file in the model directory
 
@@ -37,6 +46,7 @@ def get_model_name(sport, cookie='', athlete='default') -> str:
     """
     return '_'.join([athlete, sport, cookie]) + '.mdl'
 
+
 def get_boolean_model(sport, athlete='default') -> Path:
     """
     Return the model name for the Boolean models
@@ -45,6 +55,7 @@ def get_boolean_model(sport, athlete='default') -> Path:
     :return: a path to the boolean model name
     """
     return get_model_path(get_model_name(sport, 'bool', athlete))
+
 
 def get_categorical_model(sport, athlete='default') -> Path:
     """
@@ -56,11 +67,11 @@ def get_categorical_model(sport, athlete='default') -> Path:
     return get_model_path(get_model_name(sport, 'cat', athlete))
 
 
-def get_training_data_path(sport: str = '') -> Path:
+def get_training_data_filepath(sport: str = '') -> Path:
     """ Path to the file with known good source data"""
     return get_data_path(training_data_filename)
 
 
-def get_test_data_path() -> Path:
+def get_test_data_filepath() -> Path:
     """ Path to the XSLX file with good test data (not to be used for training. """
     return get_data_path(test_data_filename)

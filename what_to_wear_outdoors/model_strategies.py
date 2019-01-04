@@ -5,9 +5,18 @@ from pathlib import Path
 from typing import Dict, Union, Any, List, Tuple
 import numpy as np
 import pandas as pd
+from sklearn.base import TransformerMixin, BaseEstimator
+from sklearn.compose import ColumnTransformer, make_column_transformer
+from sklearn.exceptions import NotFittedError
+from sklearn.impute import SimpleImputer
 from sklearn.multioutput import MultiOutputClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, StandardScaler, OneHotEncoder
 from sklearn.tree import DecisionTreeClassifier
 import logging
+
+from sklearn.utils.validation import check_is_fitted
+
 from what_to_wear_outdoors.scoring_strategies import NoWeightScoringStrategy, WeightedScoringStrategy
 from what_to_wear_outdoors.utility import get_model_path, get_model_name
 
@@ -55,7 +64,6 @@ class IOutfitPredictorStrategy(ABC):
     @abstractmethod
     def strategy_id(self):
         pass
-
 
 def load_model(file_path, athlete='default', activity='run', version='Any') -> IOutfitPredictorStrategy:
     """
@@ -173,7 +181,7 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
         :param df: The dataframe with the training data used to train/fit the model
 
         """
-        train_X = df[self.features]
+        train_X = self._preprocess_pipeline(df[self.features])
 
         y_class = df[self.categorical_labels]
         y_bools = df[self.boolean_labels]
@@ -331,7 +339,101 @@ class SingleDecisionTreeStrategy(BaseOutfitStrategy):
         return model_score
 
 
-class NotFittedError(ValueError, AttributeError):
-    """ Exception class to raise if the model hasn't yet been fit/built
-
+class RemoveConstantColumns(TransformerMixin):
     """
+    Identify constant columns and enable their removal
+    Attributes
+    ----------
+    const_cols : list
+        The list of column names which are constant.
+        List may be of length 1.
+    """
+
+    def transform(self, df, **transform_params):
+        """
+        Returns a copy of ``df`` where the constant columns (as identified)
+        during the ``fit`` are removed
+        Parameters
+        ----------
+        df : DataFrame
+            Should have the same columns as those of the DataFrame used at
+            fitting.
+        """
+        check_is_fitted(self, 'const_cols')
+        return df.drop(self.const_cols, axis=1)
+
+    def fit(self, df, y=None, **fit_params):
+        """
+        Identify the constant columns
+        Parameters
+        ----------
+        df : DataFrame
+            Data from which constant features are identified
+        """
+        self.const_cols = df.loc[:, df.apply(pd.Series.nunique) == 1].columns
+        return self
+
+
+class LabelEncodingColumns(BaseEstimator, TransformerMixin):
+    """Label encoding selected columns
+    Apply sklearn.preprocessing.LabelEncoder_ to `cols`
+    .. _sklearn.preprocessing.LabelEncoder : https://is.gd/Vx2njl
+    Attributes
+    ----------
+    cols : list
+        List of columns in the data to be scaled
+    """
+
+    def __init__(self, cols=None):
+        self.cols = cols
+        self.les = {col: LabelEncoder() for col in cols}
+        self._is_fitted = False
+
+    def transform(self, df, **transform_params):
+        """
+        Label encoding ``cols`` of ``df`` using the fitting
+        Parameters
+        ----------
+        df : DataFrame
+            DataFrame to be preprocessed
+        """
+        if not self._is_fitted:
+            raise NotFittedError("Fitting was not preformed")
+        is_cols_subset_of_df(self.cols, df)
+
+        df = df.copy()
+
+        label_enc_dict = {}
+        for col in self.cols:
+            label_enc_dict[col] = self.les[col].transform(df[col])
+
+        labelenc_cols = pd.DataFrame(label_enc_dict,
+                                     # The index of the resulting DataFrame should be assigned and
+                                     # equal to the one of the original DataFrame. Otherwise, upon
+                                     # concatenation NaNs will be introduced.
+                                     index=df.index
+                                     )
+
+        for col in self.cols:
+            df[col] = labelenc_cols[col]
+        return df
+
+    def fit(self, df, y=None, **fit_params):
+        """
+        Fitting the preprocessing
+        Parameters
+        ----------
+        df : DataFrame
+            Data to use for fitting.
+            In many cases, should be ``X_train``.
+        """
+        is_cols_subset_of_df(self.cols, df)
+        for col in self.cols:
+            self.les[col].fit(df[col])
+        self._is_fitted = True
+        return self
+
+
+def is_cols_subset_of_df(cols, df):
+    if not set(cols).issubset(set(df.columns)):
+        raise ValueError('Class instantiated with columns not in the dataframe provided.')

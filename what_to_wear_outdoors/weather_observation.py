@@ -11,7 +11,7 @@ import dateutil as dtu
 
 NOW = dt.datetime.now()
 
-__all__ = ['Forecast', 'Weather']
+__all__ = ['Observation', 'Weather']
 
 # TODO: Put this back so that we aren't shipping the API key with the code
 dotenv.load_dotenv()
@@ -60,10 +60,10 @@ class JsonDictionary(dict):
         return None if float(self[key]) <= NULL_VALUE else float(self[key])
 
 
-class Forecast:
+class Observation:
 
     def __init__(self):
-        super(Forecast, self).__init__()
+        super(Observation, self).__init__()
         self.location = ""
         self.condition = ""
         self.feels_like = self.heat_index = self.temp_f = 0
@@ -80,7 +80,7 @@ class Forecast:
         self.timestamp = dt.datetime(year=NOW.year, month=self.mth, day=self.month_day, hour=self.tod)
 
     def __str__(self):
-        return f'Forecast for {self.location} ' \
+        return f'Observation for {self.location} ' \
             f'on {self.dow} (Month-Day): {self.mth}-{self.month_day} ' \
             f'at {self.civil_time}. ' \
             f'\n\tTemperature (feels like): {self.feels_like} °F' \
@@ -102,7 +102,7 @@ class Forecast:
         return None if float(f) <= NULL_VALUE else float(f)
 
     def from_dict(self, dct, units='english'):
-        fcast = Forecast()
+        fcast = Observation()
         units = 'english' if units != 'metric' else 'metric'
 
         time_dct = JsonDictionary(dct[FCAST_TIME_KEY])
@@ -133,14 +133,14 @@ class Weather:
         pass
 
     @staticmethod
-    def random_forecast() -> Forecast:
+    def random_forecast() -> Observation:
         """ Get a random forecast.
 
             Used for building up the dataset
 
-        :return: a Forecast
+        :return: a Observation
         """
-        f = Forecast()
+        f = Observation()
         f.tod = random.randrange(5, 21)
         f.mth = random.randrange(1, 12)
         f.month_day = random.randrange(1, 28)
@@ -167,37 +167,34 @@ class Weather:
         if FORECAST_KEY in dct:
             for f in dct[FORECAST_KEY]:
                 time_dct = JsonDictionary(f[FCAST_TIME_KEY])
-                f_key = Forecast.get_fct_key(d=time_dct.read_int(DATE_DAY),
-                                             m=time_dct.read_int(DATE_MONTH),
-                                             h=time_dct.read_int(DATE_HOUR))
-                fct = Forecast()
+                f_key = Observation.get_fct_key(d=time_dct.read_int(DATE_DAY),
+                                                m=time_dct.read_int(DATE_MONTH),
+                                                h=time_dct.read_int(DATE_HOUR))
+                fct = Observation()
                 forecasts[f_key] = fct.from_dict(f)
                 forecasts[f_key].location = location
         return forecasts
 
-    '''
-    This function gets an hourly forecast for the next 10 days.
-    '''
-
-    def get_forecast(self, dt, location: str = '72712', dbg: bool = False) -> Forecast:
+    def get_forecast(self, dt, location: str = '72712', dbg: bool = False) -> Observation:
         """
         Get the forecast for a given location and a given day/time.
         :param dt: the day and time for when the forecast should be queried
         :type location: string
         :param location: location should be either a zip code or a city, state abbreviation 
         :param bool param_name: dbg: if True, read the forecast from a file rather than querying the web service
-        :return: a Forecast object
-        """"""
-
+        :return: a Observation object
         """
+
         # dt should be the date and the time
         logging.debug('get_weather location = ' + location)
         logging.debug('date time = {}'.format(dt))
 
-        fct_key = Forecast.get_fct_key(dt.day, dt.month, dt.hour)
+        fct_key = Observation.get_fct_key(dt.day, dt.month, dt.hour)
         if _All_Forecasts_Location[location] is None or _All_Forecasts_Location[location][fct_key] is None:
             weather_request = Weather._build_weather_request(
                 location)  # +'/geolookup/conditions/hourly/q/'+city+'.json'
+
+            # Returns an hourly forecast for the next 10 days
             resp = requests.get(weather_request)
             if resp.status_code == 200:
                 wu_response = resp.json()

@@ -7,8 +7,8 @@ from unittest import TestCase
 import pandas as pd
 import pytest
 from pytest import mark, fixture
-from what_to_wear_outdoors import Weather, FctKeys, Features, get_test_data_path, \
-    get_training_data_path
+from what_to_wear_outdoors import Weather, FctKeys, Features, get_test_data_filepath, \
+    get_training_data_filepath
 from what_to_wear_outdoors.outfit_predictors import BaseOutfitPredictor, RunningOutfitPredictor
 
 TODAY = dt.date.today()
@@ -64,9 +64,9 @@ def predictor():
 @mark.parametrize("filename",
                   [
                       'all',
-                      get_training_data_path(),
+                      get_training_data_filepath(),
                       pytest.param('', marks=[mark.xfail]),
-                      pytest.param(get_test_data_path()),
+                      pytest.param(get_test_data_filepath()),
                   ],
                   )
 def test_ingest_data(build_temp_data, dataframe_format, predictor, filename):
@@ -194,8 +194,8 @@ class TestBaseOutfitPredictor(TestCase):
 
     def test_ingest_data_test_and_training(self):
         rop = RunningOutfitPredictor()
-        df1 = rop.ingest_data(get_training_data_path())
-        df2 = rop.ingest_data(get_test_data_path())
+        df1 = rop.ingest_data(get_training_data_filepath())
+        df2 = rop.ingest_data(get_test_data_filepath())
         df1_cols = list(df1.columns)
         df2_cols = list(df2.columns)
         df1_cols.sort()
