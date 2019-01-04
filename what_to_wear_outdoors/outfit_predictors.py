@@ -179,7 +179,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         # TODO: When we get good enough add in a few more categorical variables
         self._supported_features = {'scalar': [FctKeys.FEEL_TEMP, FctKeys.WIND_SPEED, FctKeys.HUMIDITY,
                                                Features.DURATION],
-                                    'categorical': [Features.LIGHT]}
+                                    'categorical': [Features.LIGHT, FctKeys.CONDITION]}
         self.__outfit = {}
         self._sample_data = None
         self._have_sample_data = False
@@ -405,6 +405,10 @@ class BaseOutfitPredictor(BaseActivityMixin):
                                    ('base_layer', self._layer_categories), ('jacket', self._jacket_categories),
                                    ('shoe_cover', self._shoe_cover_categories)]:
             df[col_name] = df[col_name].astype(CategoricalDtype(categories=cat_type, ordered=True))
+
+        # Get all the string columns and make them categorical
+        cat_columns = df.select_dtypes(['object']).columns
+        df[cat_columns] = df[cat_columns].astype('category')
         return df
 
     def _fix_layers(self, df) -> pd.DataFrame:

@@ -1,10 +1,11 @@
 PyYAML
 pytest
-dateutil
+python-dateutil
 pandas
 numpy
 requests
 python-dotenv
 click
 sklearn
+xlrd
 

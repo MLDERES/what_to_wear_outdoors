@@ -97,6 +97,7 @@ class BaseOutfitStrategy(IOutfitPredictorStrategy):
         self._features = features
         self._labels = labels
         self._is_fit = False
+        self._special_properties = {}
 
     def save_model(self, athlete='default', version=None) -> Path:
         """
@@ -141,6 +142,44 @@ class BaseOutfitStrategy(IOutfitPredictorStrategy):
     @property
     def labels(self):
         return self._labels
+
+    @property
+    def special_properties(self):
+        return self._special_properties
+
+    def _preprocess_pipeline(self, df):
+        num_si_step = ('si', SimpleImputer(strategy='median'))
+        num_ss_step = ('ss', StandardScaler())
+        num_pipe = Pipeline([num_si_step, num_ss_step])
+        cat_step = ('ohe_encoder', OneHotEncoder(sparse=False))
+
+        cat_columns = df.select_dtypes(include=['category', 'object', 'bool']).columns
+        num_columns = df._get_numeric_data().columns
+
+        ohe = OneHotEncoder(sparse=False)
+        cc = ohe.fit_transform(df[cat_columns])
+
+        nc = num_pipe.fit_transform(df[num_columns])
+
+        transformers = [('num', num_pipe, num_columns),
+                        ('cat', cat_step, cat_columns)]
+
+        ct = ColumnTransformer(transformers=transformers, remainder='passthrough')
+        df = ct.fit_transform(df)
+        return df
+
+
+    def _add_special_property(self, key, value):
+        """
+        Add some descriptive property to the model so that it can be saved or retrieved later
+        :param key: the key to save the property
+        :param value: the value of the property to set
+
+        Notes:
+        ------
+        This is here just so we can be explicit about what is getting added to the properties.  Nothing else
+        """
+        self._special_properties[key] = value
 
 
 class DualDecisionTreeStrategy(BaseOutfitStrategy):
@@ -192,6 +231,7 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
         bool_forest = DecisionTreeClassifier(max_depth=4)
         bool_forest_mo = MultiOutputClassifier(bool_forest)
         bool_forest_mo.fit(train_X, y_bools)
+        self._add_special_property('boolean_importance', zip(self.features, bool_forest.feature_importances_))
         self._boolean_model = bool_forest_mo
 
         # Now for the classifiers
@@ -200,6 +240,8 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
         mt_forest.fit(train_X, y_class)
         self._categorical_model = mt_forest
         self._is_fit = True
+        self._add_special_property('category_importance', zip(self.features, forest.feature_importances_))
+
         return mt_forest, bool_forest_mo
 
     # TODO: Handle Imperial and Metric measures (Celsius and kph wind speed)
@@ -241,7 +283,6 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
     def predict_outfits(self, df: pd.DataFrame) -> pd.DataFrame:
         """ Predict multiple outfits given the dataframe of prediction factors
 
-
         :param df:
         :return:
         """
@@ -269,8 +310,11 @@ class DualDecisionTreeStrategy(BaseOutfitStrategy):
         predicted = self.predict_outfits(df)
         actual = df[self.categorical_labels + self.boolean_labels]
 
-        return self._scoring_strategy.score(df_predicted=predicted, df_actual=actual,
-                                            drop_perfect_scores=drop_perfect_scores)
+        col_scores, overall_score = self._scoring_strategy.score(df_predicted=predicted, df_actual=actual,
+                                                                 drop_perfect_scores=drop_perfect_scores)
+        self._add_special_property('model_score', overall_score)
+        self._add_special_property('column_scores', col_scores)
+        return col_scores, overall_score
 
     def _check_has_been_fit(self) -> None:
         """ Raise NotFittedError if the model has not yet been fit
