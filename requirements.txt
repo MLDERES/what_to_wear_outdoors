@@ -1,6 +1,6 @@
 PyYAML
 pytest
-dateutil
+python-dateutil
 pandas
 numpy
 requests
