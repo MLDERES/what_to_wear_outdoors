@@ -37,6 +37,7 @@ def get_model_name(sport, cookie='', athlete='default') -> str:
     """
     return '_'.join([athlete, sport, cookie]) + '.mdl'
 
+
 def get_boolean_model(sport, athlete='default') -> Path:
     """
     Return the model name for the Boolean models
@@ -45,6 +46,7 @@ def get_boolean_model(sport, athlete='default') -> Path:
     :return: a path to the boolean model name
     """
     return get_model_path(get_model_name(sport, 'bool', athlete))
+
 
 def get_categorical_model(sport, athlete='default') -> Path:
     """
