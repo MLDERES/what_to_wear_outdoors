@@ -1,5 +1,8 @@
 import calendar
 import random
+
+import numpy as np
+import pandas as pd
 import requests
 import dotenv
 import os
@@ -8,10 +11,12 @@ import logging
 import json
 import datetime as dt
 import dateutil as dtu
+from pandas.io.json import json_normalize
+
 
 NOW = dt.datetime.now()
 
-__all__ = ['Forecast', 'Weather']
+__all__ = ['Observation', 'Weather']
 
 # TODO: Put this back so that we aren't shipping the API key with the code
 dotenv.load_dotenv()
@@ -22,7 +27,6 @@ if WU_API_KEY is None:
 
 # So lets just key our observations off of mon_day_year
 #  We'll store pretty date for whatever reason
-DATE_KEY = 'UTCDATE'
 DATE_HOUR = 'hour'
 DATE_MONTH = 'mon'
 DATE_DAY = 'mday'
@@ -30,7 +34,7 @@ DATE_YEAR = 'year'
 DAY_OF_WEEK = 'weekday_name'
 FORECAST_KEY = 'hourly_forecast'
 FCAST_TIME_KEY = 'FCTTIME'
-NULL_VALUE = -999
+NULL_VALUE = -9999
 
 
 class FctKeys:
@@ -46,7 +50,9 @@ class FctKeys:
     REAL_TEMP = 'temp_f'
     HEAT_IDX = 'heat_index'
     CONDITION = 'condition'
-
+    column_types = {CONDITION: str, HUMIDITY: float, PRECIP_PCT: float,
+                    FEEL_TEMP: float, REAL_TEMP: float, WIND_DIR: str,
+                    WIND_SPEED: float}
 
 class JsonDictionary(dict):
 
@@ -60,10 +66,10 @@ class JsonDictionary(dict):
         return None if float(self[key]) <= NULL_VALUE else float(self[key])
 
 
-class Forecast:
+class Observation:
 
     def __init__(self):
-        super(Forecast, self).__init__()
+        super(Observation, self).__init__()
         self.location = ""
         self.condition = ""
         self.feels_like = self.heat_index = self.temp_f = 0
@@ -80,7 +86,7 @@ class Forecast:
         self.timestamp = dt.datetime(year=NOW.year, month=self.mth, day=self.month_day, hour=self.tod)
 
     def __str__(self):
-        return f'Forecast for {self.location} ' \
+        return f'Observation for {self.location} ' \
             f'on {self.dow} (Month-Day): {self.mth}-{self.month_day} ' \
             f'at {self.civil_time}. ' \
             f'\n\tTemperature (feels like): {self.feels_like} °F' \
@@ -102,7 +108,7 @@ class Forecast:
         return None if float(f) <= NULL_VALUE else float(f)
 
     def from_dict(self, dct, units='english'):
-        fcast = Forecast()
+        fcast = Observation()
         units = 'english' if units != 'metric' else 'metric'
 
         time_dct = JsonDictionary(dct[FCAST_TIME_KEY])
@@ -130,17 +136,26 @@ class Forecast:
 class Weather:
 
     def __init__(self):
-        pass
+        self._past_observation_df = None
+        self._forecast_observation_df = None
+
+    @property
+    def past_observations(self):
+        return self._past_observation_df
+
+    @property
+    def forecast_observations(self):
+        return self._forecast_observation_df
 
     @staticmethod
-    def random_forecast() -> Forecast:
+    def random_forecast() -> Observation:
         """ Get a random forecast.
 
             Used for building up the dataset
 
-        :return: a Forecast
+        :return: a Observation
         """
-        f = Forecast()
+        f = Observation()
         f.tod = random.randrange(5, 21)
         f.mth = random.randrange(1, 12)
         f.month_day = random.randrange(1, 28)
@@ -162,15 +177,22 @@ class Weather:
         return f
 
     @staticmethod
-    def _build_forecasts(dct, location=''):
+    def _build_observation_df(dct, location=''):
+        """
+        Converts the JSON returned from Weather Underground into a dataframe of observations with a date/time index
+        :param dct:
+        :param location:
+        :return:
+        """
+
         forecasts = {}
         if FORECAST_KEY in dct:
             for f in dct[FORECAST_KEY]:
                 time_dct = JsonDictionary(f[FCAST_TIME_KEY])
-                f_key = Forecast.get_fct_key(d=time_dct.read_int(DATE_DAY),
-                                             m=time_dct.read_int(DATE_MONTH),
-                                             h=time_dct.read_int(DATE_HOUR))
-                fct = Forecast()
+                f_key = Observation.get_fct_key(d=time_dct.read_int(DATE_DAY),
+                                                m=time_dct.read_int(DATE_MONTH),
+                                                h=time_dct.read_int(DATE_HOUR))
+                fct = Observation()
                 forecasts[f_key] = fct.from_dict(f)
                 forecasts[f_key].location = location
         return forecasts
@@ -178,37 +200,40 @@ class Weather:
     '''
     This function gets an hourly forecast for the next 10 days.
     '''
-
-    def get_forecast(self, dt, location: str = '72712', dbg: bool = False) -> Forecast:
+    def get_weather(self, location: str = '72712', when: dt.datetime = NOW) -> Observation:
         """
         Get the forecast for a given location and a given day/time.
-        :param dt: the day and time for when the forecast should be queried
+        :param when: the day and time for when the weather should be queried, if it's in the future, then
+        we'll get the data for the next ten days and cache it, if it's in the past then we'll get the weather for
+        the entire day and keep that in the cache instead
         :type location: string
         :param location: location should be either a zip code or a city, state abbreviation 
-        :param bool param_name: dbg: if True, read the forecast from a file rather than querying the web service
-        :return: a Forecast object
-        """"""
-
+        :return: a Observation object
         """
+
         # dt should be the date and the time
         logging.debug('get_weather location = ' + location)
         logging.debug('date time = {}'.format(dt))
 
-        fct_key = Forecast.get_fct_key(dt.day, dt.month, dt.hour)
-        if _All_Forecasts_Location[location] is None or _All_Forecasts_Location[location][fct_key] is None:
-            weather_request = Weather._build_weather_request(
-                location)  # +'/geolookup/conditions/hourly/q/'+city+'.json'
+        # Need to determine if we have a forecast or observation for the day in question
+        is_fct_request = when > NOW
+        working_df = self.forecast_observations if is_fct_request else self.past_observations
+
+        wu_response = None
+        if not working_df:  # TODO: Or we can't find a suitable answer in our cache
+            # We don't even have a dataframe, so we need to create one
+            weather_request = Weather._build_forecast_request(location) if is_fct_request \
+                else Weather._build_historical_request(location, when)
             resp = requests.get(weather_request)
             if resp.status_code == 200:
                 wu_response = resp.json()
-                if dbg:
-                    with open('sample_forecast.json', 'w') as fp:
-                        json.dump(wu_response, fp)
-                _All_Forecasts_Location[location] = self._build_forecasts(wu_response, location)
+                self._build_observation_df(wu_response, location)
+                # Build the actual observation
+                # _build_observation_df
             else:
                 print(f'Danger Will Robinson we got a bad response from WU {resp.status_code}')
 
-        return _All_Forecasts_Location[location][fct_key]
+        return wu_response
 
     @staticmethod
     def _build_location_query(location):
@@ -223,7 +248,7 @@ class Weather:
         return query_loc
 
     @staticmethod
-    def _build_weather_request(location):
+    def _build_forecast_request(location):
         # http://api.wunderground.com/api/7d65568686ff9c25/features/settings/q/query.format
         # Features = alerts/almanac/astromony/conditions/forecast/hourly/hourly10day etc.
         # settings(optional) = lang, pws(personal weather stations):0 or 1
@@ -234,11 +259,82 @@ class Weather:
         return request
 
     @staticmethod
+    def _build_historical_request(location, d):
+        # http://api.wunderground.com/api/7d65568686ff9c25/features/settings/q/query.format
+        # Features = alerts/almanac/astromony/conditions/forecast/hourly/hourly10day etc.
+        # settings(optional) = lang, pws(personal weather stations):0 or 1
+        # query = location (ST/City, zipcode,Country/City, or lat,long)
+        # format = json or xml
+        rdate = d.strftime('%Y%m%d')
+        request = f'http://api.wunderground.com/api/{WU_API_KEY}/history_{rdate}/q/' \
+            f'{Weather._build_location_query(location)}.json'
+        return request
+
+    def _build_forecast_df(weather_json, location):
+        df = json_normalize(weather_json['hourly_forecast']) \
+            .drop(columns=['FCTTIME.UTCDATE', 'FCTTIME.age', 'FCTTIME.ampm', 'FCTTIME.civil',
+                           'FCTTIME.epoch', 'FCTTIME.hour_padded', 'FCTTIME.isdst', 'FCTTIME.min',
+                           'FCTTIME.mday_padded', 'FCTTIME.min_unpadded', 'FCTTIME.mon_abbrev',
+                           'FCTTIME.mon_padded', 'FCTTIME.month_name', 'FCTTIME.month_name_abbrev',
+                           'FCTTIME.pretty', 'FCTTIME.sec', 'FCTTIME.tz', 'FCTTIME.weekday_name',
+                           'FCTTIME.weekday_name_abbrev', 'FCTTIME.weekday_name_night',
+                           'FCTTIME.weekday_name_night_unlang', 'FCTTIME.weekday_name_unlang',
+                           'FCTTIME.yday', 'heatindex.english', 'heatindex.metric', 'icon', 'icon_url',
+                           'mslp.english', 'mslp.metric', 'qpf.english', 'qpf.metric', 'sky',
+                           'snow.english', 'snow.metric', 'uvi', 'wdir.degrees', 'windchill.english',
+                           'windchill.metric','temp.metric','feelslike.metric', 'wspd.metric',
+                           'fctcode', 'dewpoint.english', 'dewpoint.metric', 'wx']) \
+            .rename(
+            columns={'FCTTIME.mday': 'day', 'FCTTIME.hour': 'hour', 'FCTTIME.mon': 'month', 'FCTTIME.year': 'year',
+                     'temp.english': FctKeys.REAL_TEMP, 'feelslike.english': FctKeys.FEEL_TEMP,
+                     'wdir.dir': FctKeys.WIND_DIR, 'wspd.english': FctKeys.WIND_SPEED, 'conds':FctKeys.CONDITION,
+                     'humidity':FctKeys.HUMIDITY, 'pop':FctKeys.PRECIP_PCT, 'wirde':FctKeys.WIND_DIR})
+        dt_index = pd.to_datetime(df[['year', 'month', 'day', 'hour']])
+        df.set_index(dt_index, inplace=True)
+        df.drop(columns=['hour', 'day', 'month', 'year'], inplace=True)
+        
+        df = df.astype(FctKeys.column_types)
+        df['location'] = location
+        return df
+
+    @staticmethod
+    def _build_historic_df(weather_json, location):
+        """
+        From an historic weather observation (for a given day) build a dataframe with the weather data
+        :param weather_json: The response from the Weather Underground historic weather request
+        :param location: a location to associate this observation
+        :return: a dataframe
+        """
+        df = json_normalize(weather_json['history'], 'observations') \
+            .drop(columns=['icon', 'metar', 'utcdate', 'wgustm', 'wgusti', 'wdird', 'vism', 'visi', 'pressurem',
+                           'pressurei', 'tornado', 'fog', 'hail', 'thunder', 'dewpti', 'dewptm', 'precipm',
+                           'wspdm', 'windchillm','tempm','heatindexm', 'precipi'])\
+            .rename(columns={'conds':FctKeys.CONDITION,'hum':FctKeys.HUMIDITY, 'tempi':FctKeys.REAL_TEMP,
+                             'wdire':FctKeys.WIND_DIR, 'wspdi':FctKeys.WIND_SPEED})
+
+        df = df.astype({'heatindexi':float,'windchilli':float})
+        df[FctKeys.FEEL_TEMP] = np.where(df['heatindexi'] == NULL_VALUE, df.windchilli, df.heatindexi)
+        df.drop(columns=['heatindexi', 'windchilli'], inplace=True)
+        df[FctKeys.PRECIP_PCT] = np.where((df['rain'] == 1), 100, 0)
+        df[FctKeys.PRECIP_PCT] = np.where((df['snow'] == 1), 100, df[FctKeys.PRECIP_PCT])
+        df.drop(columns=['rain', 'snow'], inplace=True)
+        df = df.astype(FctKeys.column_types)
+
+        df2 = json_normalize(df['date']).rename(columns={'mon': 'month', 'mday': 'day', 'min': 'minute'}) \
+            .drop(columns=['pretty', 'tzname'])
+        df.drop(columns=['date'], inplace=True)
+
+        df3 = pd.to_datetime(df2).values.astype('datetime64[h]')
+        df.set_index(df3, inplace=True)
+        df['location']= location
+        return df
+
+    @staticmethod
     def _get_random_weather_condition_weights():
-        return (([60] * len(_high_conditions)) +
+        return (([70] * len(_high_conditions)) +
                 ([20] * len(_med_high_conditions)) +
-                ([15] * len(_med_conditions)) +
-                ([5] * len(_low_conditions)) +
+                ([6] * len(_med_conditions)) +
+                ([3] * len(_low_conditions)) +
                 ([1] * len(_unlikely_conditions)))
 
 

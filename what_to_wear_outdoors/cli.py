@@ -14,7 +14,7 @@ from what_to_wear_outdoors.outfit_predictors import RunningOutfitPredictor, Runn
 if __name__ == '__main__' or __package__ == '':
     from weather_observation import Weather, Forecast, FctKeys
 else:
-    from .weather_observation import Weather, Forecast, FctKeys
+    from .weather_observation import Weather, Observation, FctKeys
 
 NOW = dt.datetime.now()
 TODAY = dt.date.today()
@@ -112,8 +112,8 @@ def auto_mode(dow, hour, location):
     input()
     w = Weather()
     forecast_dt = parse_time(hour)
-    logging.debug(f'Forecast (calculated): {forecast_dt}')
-    fct = w.get_forecast(forecast_dt, location)
+    logging.debug(f'Observation (calculated): {forecast_dt}')
+    fct = w.get_weather(location, forecast_dt)
     print(fct)
     rop = RunningOutfitPredictor()
     conditions = dict(feels_like=fct.feels_like, wind_speed=fct.wind_speed, pct_humidity=fct.humidity,
@@ -206,8 +206,8 @@ def main():
     activity_duration = click.prompt(_prompt("How long will you be out?"), default=45)
 
     w = Weather()
-    logging.debug(f'Forecast date (calculated): {forecast_dt}')
-    fct = w.get_forecast(forecast_dt, activity_location)
+    logging.debug(f'Observation date (calculated): {forecast_dt}')
+    fct = w.get_weather(activity_location, forecast_dt)
     print(fct)
     rop = RunningOutfitPredictor()
     conditions = {FctKeys.FEEL_TEMP: fct.feels_like, FctKeys.WIND_SPEED: fct.wind_speed,
