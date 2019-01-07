@@ -1,4 +1,6 @@
+from os import path
 from pathlib import Path
+import datetime as dt
 
 from what_to_wear_outdoors.config import training_data_filename, test_data_filename
 
@@ -66,3 +68,17 @@ def get_training_data_path(sport: str = '') -> Path:
 def get_test_data_path() -> Path:
     """ Path to the XSLX file with good test data (not to be used for training. """
     return get_data_path(test_data_filename)
+
+
+def file_age(fn, days=0, hours=0, minutes=0, compare='older'):
+    """ Check if a file has been modified within a given time """
+    td = dt.timedelta(days=days, hours=hours, minutes=minutes)
+    try:
+        f = Path(fn)
+        now = dt.datetime.now()
+        if compare == 'older':
+            return (now - dt.datetime.fromtimestamp(path.getmtime(f))) >= td
+        else:
+            return (now - dt.datetime.fromtimestamp(path.getmtime(f))) <= td
+    except FileNotFoundError:
+        return False
