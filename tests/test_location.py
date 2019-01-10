@@ -1,7 +1,7 @@
 from unittest import TestCase
 from pytest import mark, fixture
 
-from weather_observation import Location
+from location import Location
 
 
 @mark.parametrize("l_name, sep, expected", [
@@ -18,9 +18,9 @@ from weather_observation import Location
 def test_location_repl(l_name, sep, expected):
     loc = Location(location_name=l_name)
     if sep is None:
-        assert expected == loc.repl()
+        assert loc.repl() == expected
     else:
-        assert expected == loc.repl(sep=sep)
+        assert loc.repl(sep=sep) == expected
 
 
 @mark.parametrize("l_name, expected", [
@@ -34,3 +34,15 @@ def test_location_repl(l_name, sep, expected):
 def test_location_name(l_name, expected):
     loc = Location(location_name=l_name)
     assert expected == loc.name
+
+@mark.parametrize("l_name, expected", [
+    ('72712', (36.37233,-94.20949)),
+    (' 72712 ', (36.37233,-94.20949)),
+    ('72712 ', (36.37233,-94.20949)),
+    ('Bentonville, AR', (36.37233,-94.20949)),
+    (' Bentonville, AR', (36.37233,-94.20949)),
+    ('Bentonville,AR', (36.37233,-94.20949)),
+])
+def test_get_latlong(l_name, expected):
+    loc = Location(location_name=l_name)
+    assert loc.get_latlong() == expected
