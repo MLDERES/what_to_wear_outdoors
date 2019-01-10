@@ -14,6 +14,7 @@ class Location:
         """
         :param location_name:
         """
+        self._lat = self._long = None
         self._zipcode = self._city = self._state = None
         # Deal with the case where we have gotten a location rather than a string
         if isinstance(location_name, Location):
@@ -44,6 +45,18 @@ class Location:
     def name(self):
         return ','.join([self._city, self._state]) if self._zipcode is None else self._zipcode
 
+    @property
+    def lat(self):
+        if self._lat is None:
+            self.get_latlong()
+        return self._lat
+
+    @property
+    def long(self):
+        if self._long is None:
+            self.get_latlong()
+        return self._long
+
     def get_latlong(self):
         loc_file = get_data_path(config.location_filename)
         if loc_file.exists():
@@ -56,6 +69,8 @@ class Location:
             df.set_index('location', drop=True, inplace=True)
             df.to_csv(loc_file)
         row = df.loc[self.repl('-')]
+        self._lat = row.latitude
+        self._long = row.longitude
         return (row.latitude, row.longitude)
 
     def __str__(self):

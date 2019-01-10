@@ -46,3 +46,17 @@ def test_location_name(l_name, expected):
 def test_get_latlong(l_name, expected):
     loc = Location(location_name=l_name)
     assert loc.get_latlong() == expected
+
+@mark.parametrize("l_name", [
+    '72712',
+    'Bentonville, AR',])
+def test_lat(l_name):
+    loc = Location(location_name=l_name)
+    assert loc.lat == 36.37233
+
+@mark.parametrize("l_name", [
+    '72712',
+    'Bentonville, AR',])
+def test_long(l_name):
+    loc = Location(location_name=l_name)
+    assert loc.long == -94.20949
