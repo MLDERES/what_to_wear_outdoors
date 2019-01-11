@@ -1,26 +1,36 @@
+from os import path
 from pathlib import Path
+import datetime as dt
 
 from what_to_wear_outdoors.config import training_data_filename, test_data_filename
 
 _ROOT = Path(__file__).parent
 
 
-def get_data_path(filename='.') -> Path:
+def get_data_path(filename='.', test=False) -> Path:
     """ Get the full path to a file in the data directory
 
+    :param test: True if this belongs in the test subdirectory else False
     :param filename: name of the file for which to get the full path
     :return: a Path object that points to the file passed in the filename argument
     """
-    return _ROOT / 'data' / filename
+    if test:
+        return _ROOT / 'data' / 'test' / filename
+    else:
+        return _ROOT / 'data' / filename
 
 
-def get_model_path(filename) -> Path:
+def get_model_path(filename, test=False) -> Path:
     """ Get the full path to a file in the model directory
 
-        :param filename: name of the file for which to get the full path
-        :return: a Path object that points to the file passed in the filename argument
+    :param test: True if this belongs in the test subdirectory else False
+    :param filename: name of the file for which to get the full path
+    :return: a Path object that points to the file passed in the filename argument
     """
-    return _ROOT / 'models' / filename
+    if test:
+        return _ROOT / 'models' / 'test' / filename
+    else:
+        return _ROOT / 'models' / filename
 
 
 def get_model_name(sport, cookie='', athlete='default') -> str:
@@ -37,6 +47,7 @@ def get_model_name(sport, cookie='', athlete='default') -> str:
     """
     return '_'.join([athlete, sport, cookie]) + '.mdl'
 
+
 def get_boolean_model(sport, athlete='default') -> Path:
     """
     Return the model name for the Boolean models
@@ -45,6 +56,7 @@ def get_boolean_model(sport, athlete='default') -> Path:
     :return: a path to the boolean model name
     """
     return get_model_path(get_model_name(sport, 'bool', athlete))
+
 
 def get_categorical_model(sport, athlete='default') -> Path:
     """
@@ -61,6 +73,33 @@ def get_training_data_path(sport: str = '') -> Path:
     return get_data_path(training_data_filename)
 
 
-def get_test_data_path() -> Path:
+def get_model_verification_data_path() -> Path:
     """ Path to the XSLX file with good test data (not to be used for training. """
     return get_data_path(test_data_filename)
+
+
+def is_file_newer(fn, days=0, hours=0, minutes=0):
+    """ Check if a file has been modified within a given time """
+    td = dt.timedelta(days=days, hours=hours, minutes=minutes)
+    f = Path(fn)
+    now = dt.datetime.now()
+    return (now - dt.datetime.fromtimestamp(path.getmtime(f))) <= td
+
+
+def file_exists(fn):
+    f = Path(fn)
+    return f.exists()
+
+
+def read_int(key):
+    try:
+        return None if int(key) <= -999 else int(key)
+    except ValueError:
+        return None
+
+
+def read_float(key):
+    try:
+        return None if float(key) <= -999 else float(key)
+    except ValueError:
+        return None

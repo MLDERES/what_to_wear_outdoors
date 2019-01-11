@@ -10,7 +10,7 @@ from pandas.core.dtypes.dtypes import CategoricalDtype
 from abc import abstractmethod
 import datetime as dt
 from what_to_wear_outdoors import config
-from what_to_wear_outdoors.utility import get_data_path, get_model_path, get_training_data_path, get_test_data_path
+from what_to_wear_outdoors.utility import get_data_path, get_model_path, get_training_data_path, get_model_verification_data_path
 
 from what_to_wear_outdoors.model_strategies import IOutfitPredictorStrategy, DualDecisionTreeStrategy, \
     SingleDecisionTreeStrategy, load_model
@@ -367,7 +367,7 @@ class BaseOutfitPredictor(BaseActivityMixin):
         drop_others(df, self._outfit_labels + self.features)
         return df
 
-    def _read_xl(self, filename=get_test_data_path(), sheet_name='Activity Log2') -> pd.DataFrame:
+    def _read_xl(self, filename=get_model_verification_data_path(), sheet_name='Activity Log2') -> pd.DataFrame:
         """
         Create a dataframe from an Excel sheet used to capture actual clothing choices
 
