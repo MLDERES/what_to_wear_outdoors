@@ -25,15 +25,21 @@ def forecast_json():
     return j
 
 
+@fixture
+def wth():
+    return Weather()
+
+
 @mark.parametrize("request_dt",
                   [
                       dt.datetime(2018, 1, 2, 8, 30),
                       dt.datetime(2017, 12, 5, 9),
-                      param(NOW + dt.timedelta(days=1), marks=[mark.xfail])
+                      param(NOW + dt.timedelta(days=1)),
+                      None
                   ])
 @mark.parametrize("location", ['Bentonville, AR', '72712'])
-def test__build_historical_request(request_dt, location):
-    r = Weather._build_historical_request(location=location, d=request_dt)
+def test_get_darksky_weather(location, request_dt):
+    r = Weather.get_darksky_weather(location=location, when=request_dt)
     print(f'{r}')
 
 
@@ -41,32 +47,48 @@ def test__build_historical_request(request_dt, location):
                   [
                       dt.datetime(2018, 1, 2, 8, 30),
                       dt.datetime(2017, 12, 5, 9),
+                      dt.datetime(2016, 12, 5, 9),
                       param(NOW + dt.timedelta(days=1)),
+                      param(NOW + dt.timedelta(hours=12)),
                       param(NOW + dt.timedelta(days=12), marks=[mark.xfail])
-                  ])
+                  ],
+                  ids=['past_weather_2018', 'past_weather_2017', 'past_weather_2016', 'tomorrow',
+                       'now+12 hours', '12 days ahead'])
 @mark.parametrize("location", ['Bentonville, AR', '72712'])
-def test_get_weather(location, when):
-    w = Weather()
-    r = w.get_weather(location_name=location, when=when)
+def test_get_weather(wth, location, when):
+    r = wth.get_weather(location_name=location, when=when)
     print(f'{r}')
-    assert 1
-
-
-def test_historic_forecast_same_cols(forecast_json, historical_json):
-    df_fct = Weather._build_forecast_df(forecast_json, '72712')
-    df_historic = Weather._build_historic_df(historical_json, '72712')
-    print(f'\nColumns in historic and not in fct:\n:'
-          f'{[x for x in df_historic.columns if x not in df_fct.columns]}')
-    print(f'\nColumns in fct and not in historic:\n:'
-          f'{[x for x in df_fct.columns if x not in df_historic.columns]}')
 
 
 def test_get_historic_weather():
     w = Weather()
     df_hist = w.get_weather('72712', dt.datetime(year=2018, month=2, day=3, hour=7, minute=5))
     df_hist2 = w.get_weather('72712', dt.datetime(year=2018, month=2, day=3, hour=7))
-    assert compare_two_series(df_hist, df_hist2)
+    assert df_hist == df_hist2
 
+@mark.parametrize("when",
+                  [
+                      param(NOW + dt.timedelta(days=1)),
+                      param(NOW + dt.timedelta(hours=1)),
+                      param(NOW + dt.timedelta(days=1, hours=3)),
+                  ],
+                  ids=['tomorrow_same_time', 'next_hour', 'now_plus_1_day_5_hours'])
+@mark.parametrize("location", ['Bentonville, AR', '72712'])
+def test__get_weather_forecast(wth, when, location):
+    o = wth._get_weather_forecast(location, when)
+    print(f'{o}')
+
+@mark.parametrize("when",
+                  [
+                      dt.datetime(2018, 11, 1, 8),
+                      dt.datetime(2017, 12, 5, 9),
+                      dt.datetime(2016, 12, 5, 9),
+                  ],
+                  ids=['past_weather_2018', 'past_weather_2017', 'past_weather_2016'])
+@mark.parametrize("location", ['Bentonville, AR', '72712'])
+def test__get_past_observation(wth, when, location):
+    o = wth._get_past_observation(location, when)
+    print(f'{o}')
 
 
 def compare_two_series(series_a, series_b):

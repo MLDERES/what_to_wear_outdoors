@@ -7,22 +7,30 @@ from what_to_wear_outdoors.config import training_data_filename, test_data_filen
 _ROOT = Path(__file__).parent
 
 
-def get_data_path(filename='.') -> Path:
+def get_data_path(filename='.', test=False) -> Path:
     """ Get the full path to a file in the data directory
 
+    :param test: True if this belongs in the test subdirectory else False
     :param filename: name of the file for which to get the full path
     :return: a Path object that points to the file passed in the filename argument
     """
-    return _ROOT / 'data' / filename
+    if test:
+        return _ROOT / 'data' / 'test' / filename
+    else:
+        return _ROOT / 'data' / filename
 
 
-def get_model_path(filename) -> Path:
+def get_model_path(filename, test=False) -> Path:
     """ Get the full path to a file in the model directory
 
-        :param filename: name of the file for which to get the full path
-        :return: a Path object that points to the file passed in the filename argument
+    :param test: True if this belongs in the test subdirectory else False
+    :param filename: name of the file for which to get the full path
+    :return: a Path object that points to the file passed in the filename argument
     """
-    return _ROOT / 'models' / filename
+    if test:
+        return _ROOT / 'models' / 'test' / filename
+    else:
+        return _ROOT / 'models' / filename
 
 
 def get_model_name(sport, cookie='', athlete='default') -> str:
@@ -65,7 +73,7 @@ def get_training_data_path(sport: str = '') -> Path:
     return get_data_path(training_data_filename)
 
 
-def get_test_data_path() -> Path:
+def get_model_verification_data_path() -> Path:
     """ Path to the XSLX file with good test data (not to be used for training. """
     return get_data_path(test_data_filename)
 
